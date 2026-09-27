@@ -1,11 +1,13 @@
 import { useCallback, useMemo, useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import { ColorTheme } from "@/types/theme-props";
 import { useThemeStyle } from "@/common/hooks";
 import { useTranslations } from "@/common/hooks/use-translations";
 import { useSession } from "@/common/hooks/use-session";
-import { getPrimaryCurrency } from "@/common/currency-util";
-import { gutter } from "@/common/theme";
+import { useDisplayCurrency } from "@/common/hooks/use-display-currency";
+import { fontSizes, gutter } from "@/common/theme";
+import { CurrencySelector } from "@/components/currency-selector";
+import { formatSignedMoneyWithCurrency } from "@/common/number-utils";
 import { LedgerDrawerHeader } from "@/components/ledger-drawer/ledger-drawer-header";
 import { StaleDataBanner } from "@/components/stale-data-banner";
 import { LedgerGuard, useLedgerGuard } from "@/components/ledger-guard";
@@ -27,6 +29,7 @@ import { selectRangedAccountTree } from "./selectors/select-ranged-account-tree"
 import {
   selectIncomeExpenseChartSeries,
   selectStatementAnchorMonth,
+  selectUnconvertedTotals,
 } from "./selectors/select-income-expense-chart";
 import { topNWithOther } from "./selectors/select-breakdown-rows";
 import {
@@ -49,6 +52,12 @@ const getStyles = (theme: ColorTheme) =>
       flex: 1,
       backgroundColor: theme.white,
     },
+    notConverted: {
+      fontSize: fontSizes.xs,
+      color: theme.black60,
+      paddingHorizontal: gutter,
+      paddingBottom: 8,
+    },
   });
 
 const ReportsScreenImpl = (): JSX.Element => {
@@ -65,14 +74,18 @@ const ReportsScreenImpl = (): JSX.Element => {
     data: ledgerMeta,
     error: ledgerMetaError,
   } = useLedgerMeta(userId, ledgerId);
-  const currency = getPrimaryCurrency(currencies);
+  const {
+    currency,
+    options: currencyOptions,
+    setCurrency,
+  } = useDisplayCurrency(ledgerId, currencies);
 
   const {
     data: incomeData,
     loading: incomeLoading,
     refetch: incomeRefetch,
     error: incomeError,
-  } = useIncomeStatement(ledgerId);
+  } = useIncomeStatement(ledgerId, currency);
   const stmt = incomeData?.getLedgerIncomeStatement;
 
   const onRefresh = useCallback(async () => {
@@ -137,6 +150,21 @@ const ReportsScreenImpl = (): JSX.Element => {
     [currency, stmt, timeRange],
   );
 
+  // Currencies the server couldn't fold into `currency` for lack of a direct or
+  // inverse price (an JPY balance in a EUR/GBP ledger, say), summed over the
+  // visible range — disclosed under the chart instead of silently vanishing.
+  const unconverted = useMemo(
+    () =>
+      selectUnconvertedTotals(
+        currency,
+        timeRange,
+        stmt?.incomeData,
+        stmt?.expensesData,
+        stmt?.netProfitData,
+      ),
+    [currency, timeRange, stmt],
+  );
+
   const isLoading = incomeLoading && !incomeData;
   const showStale = isShowingStaleDataFromQueries([
     { data: incomeData, error: incomeError },
@@ -151,6 +179,11 @@ const ReportsScreenImpl = (): JSX.Element => {
         value={timeRange}
         options={rangeOptions}
         onChange={setTimeRange}
+      />
+      <CurrencySelector
+        currency={currency}
+        options={currencyOptions}
+        onChange={setCurrency}
       />
       <DashboardScrollView
         refreshing={refreshing}
@@ -172,6 +205,20 @@ const ReportsScreenImpl = (): JSX.Element => {
                 expense={chart.expense}
                 net={chart.net}
               />
+              {unconverted.length > 0 ? (
+                <Text style={styles.notConverted}>
+                  {t("notConverted", {
+                    amounts: unconverted
+                      .map((amount) =>
+                        formatSignedMoneyWithCurrency(
+                          amount.number,
+                          amount.currency,
+                        ),
+                      )
+                      .join(", "),
+                  })}
+                </Text>
+              ) : null}
             </FadeInView>
           )}
         </DashboardCard>

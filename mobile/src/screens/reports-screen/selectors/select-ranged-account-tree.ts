@@ -6,7 +6,11 @@ import type {
   AccountNode,
   CategoryKey,
 } from "../../../components/account-list/select-account-list";
-import { resolveCurrencyBalance } from "../../../common/balance-util";
+import {
+  unconvertedOf,
+  type UnconvertedAmount,
+} from "../../../common/balance-util";
+import { amountIn } from "../../../common/balance-display";
 import { rangeStartMonth, type TimeRange } from "../../../common/series-util";
 
 /** A monthly income/expense point carrying per-account balances. */
@@ -99,15 +103,15 @@ export function selectRangedAccountTree(
     readonly (MonthlyAccountPoint | null | undefined)[] | null | undefined,
   range: TimeRange,
   category: CategoryKey,
-): { tree: AccountNode[]; total: number } {
+): { tree: AccountNode[]; total: number; unconverted: UnconvertedAmount[] } {
   if (!currency || !points || points.length === 0) {
-    return { tree: [], total: 0 };
+    return { tree: [], total: 0, unconverted: [] };
   }
 
   // Window: anchored to the latest point's month (matches filterSeriesByRange).
   const dated = points.filter((p): p is MonthlyAccountPoint => !!p?.date);
   if (dated.length === 0) {
-    return { tree: [], total: 0 };
+    return { tree: [], total: 0, unconverted: [] };
   }
   dated.sort((a, b) => a.date.localeCompare(b.date));
   const cutoff = rangeStartMonth(
@@ -118,8 +122,12 @@ export function selectRangedAccountTree(
     ? dated.filter((p) => p.date.slice(0, 7) >= cutoff)
     : dated;
 
-  // Sum each account's resolved balance across the window.
+  // Sum each account's resolved balance across the window, strictly: a
+  // currency the server could not fold into `currency` (no direct or inverse
+  // price) is never mislabeled via the old USD fallback — it's collected
+  // separately below and disclosed as "not converted".
   const sums = new Map<string, number>();
+  const unconvertedTotals = new Map<string, number>();
   for (const point of ranged) {
     const accountBalances = (point.accountBalances ?? {}) as Record<
       string,
@@ -129,12 +137,22 @@ export function selectRangedAccountTree(
       if (!account) {
         continue;
       }
-      const value = resolveCurrencyBalance(balances ?? {}, currency);
+      const value = amountIn(balances, currency).number;
       sums.set(account, (sums.get(account) ?? 0) + value);
+      for (const leftover of unconvertedOf(balances, currency)) {
+        unconvertedTotals.set(
+          leftover.currency,
+          (unconvertedTotals.get(leftover.currency) ?? 0) + leftover.number,
+        );
+      }
     }
   }
+  const unconverted: UnconvertedAmount[] = Array.from(
+    unconvertedTotals,
+    ([leftoverCurrency, number]) => ({ currency: leftoverCurrency, number }),
+  ).filter((amount) => amount.number !== 0);
   if (sums.size === 0) {
-    return { tree: [], total: 0 };
+    return { tree: [], total: 0, unconverted };
   }
 
   // Build a trie from the account paths, roll up leaf sums, and convert to the
@@ -156,7 +174,7 @@ export function selectRangedAccountTree(
     }
   }
   if (topLevel.length === 0) {
-    return { tree: [], total: 0 };
+    return { tree: [], total: 0, unconverted };
   }
 
   const fakeRoot: TreeNode = {
@@ -170,5 +188,5 @@ export function selectRangedAccountTree(
     CATEGORY_SIGN[category],
   );
   const total = tree.reduce((sum, node) => sum + node.value, 0);
-  return { tree, total };
+  return { tree, total, unconverted };
 }

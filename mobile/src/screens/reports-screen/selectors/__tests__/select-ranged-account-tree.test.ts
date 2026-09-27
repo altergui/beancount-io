@@ -16,10 +16,12 @@ describe("selectRangedAccountTree", () => {
     expect(selectRangedAccountTree("USD", undefined, "6M", "income")).toEqual({
       tree: [],
       total: 0,
+      unconverted: [],
     });
     expect(selectRangedAccountTree("USD", [], "6M", "income")).toEqual({
       tree: [],
       total: 0,
+      unconverted: [],
     });
   });
 
@@ -30,7 +32,7 @@ describe("selectRangedAccountTree", () => {
       "ALL",
       "income",
     );
-    expect(result).toEqual({ tree: [], total: 0 });
+    expect(result).toEqual({ tree: [], total: 0, unconverted: [] });
   });
 
   it("lists top-level accounts sorted by balance for ALL range, total = sum", () => {
@@ -191,7 +193,11 @@ describe("selectRangedAccountTree", () => {
     expect(result.total).toBe(37000);
   });
 
-  it("resolves the active currency and falls back to USD", () => {
+  it("reads only the active currency, strictly — no USD fallback (see amountIn)", () => {
+    // Updated deliberately: Reports used to read `resolveCurrencyBalance`,
+    // which silently folded a USD balance into a non-USD total (a CNY ledger's
+    // "UsdJob" account used to count as ¥1000 of the CNY figure). It now reads
+    // strictly and discloses the USD leftover instead of mislabeling it.
     const result = selectRangedAccountTree(
       "CNY",
       [
@@ -203,9 +209,10 @@ describe("selectRangedAccountTree", () => {
       "ALL",
       "income",
     );
-    expect(result.tree.map((n) => n.name)).toEqual(["Salary", "UsdJob"]);
-    expect(result.tree.map((n) => n.value)).toEqual([6500, 1000]);
-    expect(result.total).toBe(7500);
+    expect(result.tree.map((n) => n.name)).toEqual(["Salary"]);
+    expect(result.tree.map((n) => n.value)).toEqual([6500]);
+    expect(result.total).toBe(6500);
+    expect(result.unconverted).toEqual([{ currency: "USD", number: -1000 }]);
   });
 
   it("parses string balances", () => {

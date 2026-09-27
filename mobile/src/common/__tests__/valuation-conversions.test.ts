@@ -44,10 +44,24 @@ describe("valuation conversions", () => {
     }
   });
 
-  it("keeps Reports and the account journal at cost", () => {
+  it("keeps the account journal at cost, and Reports at cost by default", () => {
+    // Updated deliberately (multicurrency v1): Reports no longer hardcodes
+    // `BALANCE_CONVERSION` as the query variable — it now forwards whichever
+    // conversion the caller asks for, defaulting to BALANCE_CONVERSION for
+    // any caller that doesn't pass one, and the Reports screen itself passes
+    // its selected display currency (`useIncomeStatement(ledgerId, currency)`)
+    // so GBP flows convert into the chosen currency instead of staying at
+    // cost in the ledger's raw operating currency. `at_cost` remains the
+    // *default*, still pinned by the constant assertion above.
+    const incomeStatementHook = read(
+      "reports-screen/hooks/use-income-statement.ts",
+    );
     expect(
-      read("reports-screen/hooks/use-income-statement.ts").includes(
-        "conversion: BALANCE_CONVERSION",
+      incomeStatementHook.includes("conversion: string = BALANCE_CONVERSION"),
+    ).toBe(true);
+    expect(
+      read("reports-screen/reports-screen.tsx").includes(
+        "useIncomeStatement(ledgerId, currency)",
       ),
     ).toBe(true);
     expect(
