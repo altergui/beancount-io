@@ -166,3 +166,92 @@ describe("amountIn", () => {
     expect(amountIn(undefined, "USD")).toEqual({ number: 0, scale: 0 });
   });
 });
+
+describe("selectBalanceDisplay with multiple operating currencies", () => {
+  it("reads two fiat holdings as kind: multi, display currency first", () => {
+    const display = selectBalanceDisplay(
+      { EUR: "-8421.17", GBP: "7250.00" },
+      undefined,
+      "EUR",
+      undefined,
+      ["EUR", "GBP"],
+      -6500,
+    );
+    expect(display).toEqual({
+      kind: "multi",
+      holdings: [
+        { currency: "EUR", number: -8421.17, scale: 2 },
+        { currency: "GBP", number: 7250, scale: 2 },
+      ],
+      converted: -6500,
+      notInTotal: [],
+    });
+  });
+
+  it("reads a lone non-display fiat holding as kind: multi too, not a bogus zero", () => {
+    // The GBP-only bank account bug: a GBP-only account viewed in EUR must show its
+    // real £ balance, never €0.00 from the old USD-fallback read.
+    const display = selectBalanceDisplay(
+      { GBP: "7250.00" },
+      undefined,
+      "EUR",
+      undefined,
+      ["EUR", "GBP"],
+      2280,
+    );
+    expect(display).toEqual({
+      kind: "multi",
+      holdings: [{ currency: "GBP", number: 7250, scale: 2 }],
+      converted: 2280,
+      notInTotal: [],
+    });
+  });
+
+  it("keeps a single display-currency holding a plain money figure", () => {
+    const display = selectBalanceDisplay(
+      { EUR: "1234.5" },
+      undefined,
+      "EUR",
+      undefined,
+      ["EUR", "GBP"],
+    );
+    expect(display).toEqual({ kind: "money", value: 1234.5, notInTotal: [] });
+  });
+
+  it("keeps a non-fiat commodity (VACHR) out of the multi holdings, as notInTotal", () => {
+    const display = selectBalanceDisplay(
+      { EUR: "-8421.17", GBP: "7250.00", VACHR: "-13" },
+      undefined,
+      "EUR",
+      undefined,
+      ["EUR", "GBP"],
+      -6500,
+    );
+    expect(display).toEqual({
+      kind: "multi",
+      holdings: [
+        { currency: "EUR", number: -8421.17, scale: 2 },
+        { currency: "GBP", number: 7250, scale: 2 },
+      ],
+      converted: -6500,
+      notInTotal: [{ currency: "VACHR", number: -13, scale: 0 }],
+    });
+  });
+
+  it("without an explicit operatingCurrencies list, reads only the display currency, GBP left as notInTotal", () => {
+    // Default is [currency] — an old caller that hasn't opted into multi-currency
+    // display still reads exactly the EUR figure, with GBP merely disclosed —
+    // the pre-existing single-currency behavior every old test relies on.
+    expect(
+      selectBalanceDisplay(
+        { EUR: "-8421.17", GBP: "7250.00" },
+        undefined,
+        "EUR",
+      ),
+    ).toEqual({
+      kind: "money",
+      value: -8421.17,
+      notInTotal: [{ currency: "GBP", number: 7250, scale: 2 }],
+    });
+  });
+});

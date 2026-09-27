@@ -178,6 +178,9 @@ export const en = {
   account: "Account",
   atCost: "{{amount}} at cost",
   notInTotal: "Not in total: {{amounts}}",
+  displayCurrency: "Display currency",
+  approxTotal: "≈ {{amount}}",
+  notConverted: "Not converted: {{amounts}}",
   atMarket: "{{amount}} at market",
   atMarketValue: "At market value",
   pricesNotUpdatedSince: {

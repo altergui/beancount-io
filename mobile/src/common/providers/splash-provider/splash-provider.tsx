@@ -6,6 +6,7 @@ import { View, StyleSheet } from "react-native";
 import { loadLocale } from "@/common/vars/locale";
 import { loadLedger, ledgerVar } from "@/common/vars/ledger";
 import { loadTheme } from "@/common/vars/theme";
+import { loadDisplayCurrency } from "@/common/vars/display-currency";
 import { loadSession, sessionVar } from "@/common/vars/session";
 import {
   getServerUrl,
@@ -60,6 +61,7 @@ const SplashProviderComponent = ({
           loadSession(),
           loadLedger(),
           loadTheme(),
+          loadDisplayCurrency(),
           loadAccountUsage(),
           loadMerchantRecurringOverrides(),
         ]);

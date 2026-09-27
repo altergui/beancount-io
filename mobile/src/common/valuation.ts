@@ -421,6 +421,13 @@ export function balanceNotes(
       ? valuationNotes(display.valuation, t, locale)
       : notInTotalNotes(display.notInTotal, t);
   }
+  if (display.kind === "multi") {
+    // The "≈ total" line is rendered separately (it needs the display
+    // currency's own formatting and the `approxTotal` wording, not a plain
+    // amount list) — this only discloses genuinely unconverted holdings, same
+    // as the money case.
+    return notInTotalNotes(display.notInTotal, t);
+  }
   const { value } = display;
   if (value === null || value.basis === null) return [];
   return [

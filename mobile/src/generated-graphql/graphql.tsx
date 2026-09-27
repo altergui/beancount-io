@@ -303,7 +303,7 @@ export type LedgerPricesQueryVariables = Exact<{
 }>;
 
 
-export type LedgerPricesQuery = { getLedgerCommodities: Array<{ base: string, quote: string, prices: Array<{ date: string }> }> };
+export type LedgerPricesQuery = { getLedgerCommodities: Array<{ base: string, quote: string, prices: Array<{ date: string, value: string }> }> };
 
 export type ListCommitsQueryVariables = Exact<{
   ledgerId: string;
@@ -2038,6 +2038,7 @@ export const LedgerPricesDocument = gql`
     quote
     prices {
       date
+      value
     }
   }
 }

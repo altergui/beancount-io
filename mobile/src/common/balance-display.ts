@@ -62,6 +62,24 @@ export type BalanceDisplay =
        * unknown.
        */
       value: { amount: number; basis: ValueBasis | null } | null;
+    }
+  | {
+      kind: "multi";
+      /**
+       * Every fiat holding this balance carries, shown natively rather than
+       * folded into one total — the display currency first (when held), then
+       * the rest by descending magnitude.
+       */
+      holdings: Holding[];
+      /**
+       * The server-converted total in the display currency, when the caller
+       * has one to offer (a second, `displayCurrency`-scoped read of the same
+       * balance). Shown as "≈" under the native holdings; absent while that
+       * read hasn't landed yet.
+       */
+      converted?: number;
+      /** Non-fiat holdings (stock, vacation hours) the total still excludes. */
+      notInTotal: Holding[];
     };
 
 /**
@@ -98,30 +116,75 @@ export function notInTotalOf(map: BalanceMap, currency: string): Holding[] {
  * `units` map. Without the units read, a commodity held at cost stays a money
  * figure, and only a balance of one unconverted commodity reads in units.
  * `basisOf` says which basis the valued map read a commodity at.
+ *
+ * `operatingCurrencies` names every currency the ledger (or the display-currency
+ * picker) treats as fiat and worth showing natively — defaulting to just
+ * `currency` itself, which reproduces the single-currency behavior every
+ * existing caller and test relies on. A balance holding more than one of those
+ * currencies, or exactly one that isn't `currency`, reads as `kind: "multi"`
+ * instead of folding (or silently mislabeling, via the old USD fallback) one
+ * currency's figure as the total. `convertedTotal` is that total, read
+ * separately by the caller from a second `conversion: currency`-scoped balance
+ * — this function has no access to a currency graph of its own.
  */
 export function selectBalanceDisplay(
   valued: BalanceMap,
   units: BalanceMap,
   currency: string,
   basisOf: (commodity: string) => ValueBasis | null = () => null,
+  operatingCurrencies: readonly string[] = [currency],
+  convertedTotal?: number,
 ): BalanceDisplay {
-  const value = resolveCurrencyBalance(valued, currency);
-  const notInTotal = notInTotalOf(valued, currency);
+  const notInTotalForUnits = notInTotalOf(valued, currency);
+  const valueForUnits = resolveCurrencyBalance(valued, currency);
   const unitsHeld = holdingsOf(units);
   const [map, held]: [BalanceMap, Holding[]] =
     unitsHeld.length > 0 ? [units, unitsHeld] : [valued, holdingsOf(valued)];
 
-  if (held.length === 1 && held[0].currency !== operatingKey(map, currency)) {
+  if (
+    held.length === 1 &&
+    held[0].currency !== operatingKey(map, currency) &&
+    // A lone fiat holding that merely isn't `currency` (a GBP-only account
+    // viewed in EUR) is a multi-currency balance, not a commodity: it falls
+    // through to the fiat classification below instead of reading in "units".
+    !operatingCurrencies.includes(held[0].currency)
+  ) {
     return {
       kind: "units",
       units: held[0],
       value:
-        notInTotal.length === 0 && value !== 0
-          ? { amount: value, basis: basisOf(held[0].currency) }
+        notInTotalForUnits.length === 0 && valueForUnits !== 0
+          ? { amount: valueForUnits, basis: basisOf(held[0].currency) }
           : null,
     };
   }
-  return { kind: "money", value, notInTotal };
+
+  const holdings = holdingsOf(valued);
+  const fiat = holdings.filter((holding) =>
+    operatingCurrencies.includes(holding.currency),
+  );
+  const notInTotal = holdings.filter(
+    (holding) => !operatingCurrencies.includes(holding.currency),
+  );
+
+  if (fiat.length === 0) {
+    return { kind: "money", value: 0, notInTotal };
+  }
+  if (fiat.length === 1 && fiat[0].currency === currency) {
+    return { kind: "money", value: fiat[0].number, notInTotal };
+  }
+  return {
+    kind: "multi",
+    holdings: [...fiat].sort((a, b) =>
+      a.currency === currency
+        ? -1
+        : b.currency === currency
+          ? 1
+          : Math.abs(b.number) - Math.abs(a.number),
+    ),
+    converted: convertedTotal,
+    notInTotal,
+  };
 }
 
 export const formatHolding = (holding: Holding, includePlus = false): string =>

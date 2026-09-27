@@ -61,3 +61,30 @@ export function resolveCurrencyBalance(
   }
   return typeof value === "number" ? value : 0;
 }
+
+/** One currency's leftover amount a conversion could not fold into its target. */
+export type UnconvertedAmount = { currency: string; number: number };
+
+/**
+ * Every non-zero entry of a server-converted balance map that isn't `currency`
+ * itself — the residue `resolveConversion` (backend-cluster/ledger) leaves
+ * under its own key when the ledger has no direct or inverse price to fold it
+ * into the requested currency. Strict, unlike `resolveCurrencyBalance`: no USD
+ * fallback, since Reports must never mislabel a foreign-currency figure as the
+ * display currency (see `amountIn` in `balance-display.ts` for the same rule
+ * on a single key).
+ */
+export function unconvertedOf(
+  balanceChildren: Record<string, number | string> | null | undefined,
+  currency: string,
+): UnconvertedAmount[] {
+  return Object.entries(balanceChildren ?? {}).flatMap(([key, raw]) => {
+    if (key === currency) {
+      return [];
+    }
+    const number = typeof raw === "string" ? Number(raw) : raw;
+    return typeof number === "number" && !isNaN(number) && number !== 0
+      ? [{ currency: key, number }]
+      : [];
+  });
+}

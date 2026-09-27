@@ -4,6 +4,7 @@ query LedgerPrices($ledgerId: String!) {
     quote
     prices {
       date
+      value
     }
   }
 }
