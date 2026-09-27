@@ -22,9 +22,15 @@ describe("valuation conversions", () => {
     expect(BALANCE_CONVERSION).toBe("at_cost");
   });
 
-  it("reads Home's balance sheet at market", () => {
+  it("reads Home's balance sheet at market by default", () => {
+    // Updated deliberately (multicurrency v1): useBalanceSheet now takes a
+    // `conversion` param (defaulting to VALUATION_CONVERSION) so Home can read
+    // a second, display-currency-scoped copy for the net-worth chart while
+    // the default (native, at market) copy still backs the holdings breakdown.
     const src = read("home-screen/hooks/use-balance-sheet.ts");
-    expect(src.includes("conversion: VALUATION_CONVERSION")).toBe(true);
+    expect(src.includes("conversion: string = VALUATION_CONVERSION")).toBe(
+      true,
+    );
   });
 
   it("measures Home against the same series at cost and in units", () => {

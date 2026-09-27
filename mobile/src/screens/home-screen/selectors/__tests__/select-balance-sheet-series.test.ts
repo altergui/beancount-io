@@ -2,6 +2,7 @@ import {
   selectNetWorthSeries,
   selectAssetsSeries,
   selectLiabilitiesSeries,
+  selectNetWorthHoldings,
   selectSeriesValuation,
 } from "../select-balance-sheet-series";
 import {
@@ -192,5 +193,34 @@ describe("selectSeriesValuation", () => {
     expect(valuation.cost).toBe(null);
     expect(valuation.valuesHoldings).toBe(false);
     expect(valuation.notInTotal).toEqual([]);
+  });
+});
+
+describe("selectNetWorthHoldings", () => {
+  it("returns nothing without data or with an empty latest balance", () => {
+    expect(selectNetWorthHoldings(undefined)).toEqual([]);
+    expect(selectNetWorthHoldings(createBalanceSheet({}))).toEqual([]);
+  });
+
+  it("lists every native currency the latest net worth point holds", () => {
+    const data = createBalanceSheet({
+      netWorthData: [
+        { date: "2025-08-31", balance: { EUR: "1000" } },
+        { date: "2025-09-30", balance: { EUR: "-8421.17", GBP: "7250.00" } },
+      ],
+    });
+    expect(selectNetWorthHoldings(data)).toEqual([
+      { currency: "EUR", number: -8421.17, scale: 2 },
+      { currency: "GBP", number: 7250, scale: 2 },
+    ]);
+  });
+
+  it("reads only the latest point, not the whole history", () => {
+    const data = createBalanceSheet({
+      netWorthData: [{ date: "2025-09-30", balance: { EUR: "1000" } }],
+    });
+    expect(selectNetWorthHoldings(data)).toEqual([
+      { currency: "EUR", number: 1000, scale: 0 },
+    ]);
   });
 });

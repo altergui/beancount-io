@@ -7,13 +7,16 @@ import { useLedgerMeta } from "@/common/hooks/use-ledger-meta";
 import { useBalanceSheet } from "@/screens/home-screen/hooks/use-balance-sheet";
 import { useBalanceSheetBasis } from "@/screens/home-screen/hooks/use-balance-sheet-basis";
 import { useLedgerPrices } from "@/common/hooks/use-ledger-prices";
+import { useDisplayCurrency } from "@/common/hooks/use-display-currency";
 import {
   selectAssetsSeries,
   selectLiabilitiesSeries,
+  selectNetWorthHoldings,
   selectNetWorthSeries,
   selectSeriesValuation,
   type SheetSeries,
 } from "@/screens/home-screen/selectors/select-balance-sheet-series";
+import { formatHolding } from "@/common/balance-display";
 import {
   costBasisLine,
   valuationStatus,
@@ -70,6 +73,10 @@ const HomeScreenImpl = (): JSX.Element => {
   } = useLedgerMeta(userId, ledgerId);
 
   const currency = getPrimaryCurrency(currencies);
+  const { currency: displayCurrency } = useDisplayCurrency(
+    ledgerId,
+    currencies,
+  );
   // One balance-sheet query feeds all three curves on the card. Home is the
   // only place net worth is charted; the Accounts tab is account lists only.
   const {
@@ -78,9 +85,25 @@ const HomeScreenImpl = (): JSX.Element => {
     refetch: balanceSheetRefetch,
     error: balanceSheetError,
   } = useBalanceSheet(ledgerId);
+  // Net worth alone is re-read in the selected display currency — assets and
+  // liabilities stay native, since those cards' own accounts (mostly) live in
+  // one currency each; net worth is the one figure that sums across all of
+  // them and needs a single currency to be a meaningful total.
+  const {
+    data: convertedBalanceSheet,
+    loading: convertedLoading,
+    refetch: convertedRefetch,
+    error: convertedError,
+  } = useBalanceSheet(ledgerId, undefined, displayCurrency);
   const netWorthSeries = useMemo(
-    () => selectNetWorthSeries(currency, balanceSheet),
-    [currency, balanceSheet],
+    () => selectNetWorthSeries(displayCurrency, convertedBalanceSheet),
+    [displayCurrency, convertedBalanceSheet],
+  );
+  // The same net worth, broken down by native currency (EUR / GBP / …) — shown
+  // as a footnote line under the chart when there's more than one to show.
+  const netWorthHoldings = useMemo(
+    () => selectNetWorthHoldings(balanceSheet),
+    [balanceSheet],
   );
   const assetsSeries = useMemo(
     () => selectAssetsSeries(currency, balanceSheet),
@@ -136,7 +159,17 @@ const HomeScreenImpl = (): JSX.Element => {
         liabilities: caption("liabilities"),
       },
       chartFootnotes: {
-        netWorth: costBasisLine(pages.netWorth, currency, t) ?? undefined,
+        netWorth:
+          [
+            costBasisLine(pages.netWorth, currency, t),
+            netWorthHoldings.length > 1
+              ? netWorthHoldings
+                  .map((holding) => formatHolding(holding))
+                  .join(" · ")
+              : null,
+          ]
+            .filter((line): line is string => Boolean(line))
+            .join(" — ") || undefined,
       },
     };
   }, [
@@ -148,6 +181,7 @@ const HomeScreenImpl = (): JSX.Element => {
     prices,
     managed,
     today,
+    netWorthHoldings,
   ]);
   // The page whose holdings the detail sheet shows; null while it is closed.
   const [detailPage, setDetailPage] = useState<ChartKey | null>(null);
@@ -163,13 +197,17 @@ const HomeScreenImpl = (): JSX.Element => {
   // then says only what it can still tell.
   const isLoading =
     (balanceSheetLoading && !balanceSheet) ||
+    (convertedLoading && !convertedBalanceSheet && !convertedError) ||
     (basisLoading && !balanceSheetBasis && !basisError) ||
     (pricesLoading && !pricesData && !pricesError);
   // First-load failure (error, no cache) keeps the chart skeleton; cached
   // data with a failed refetch shows the numbers + stale banner instead.
-  const chartError = Boolean(balanceSheetError) && !balanceSheet;
+  const chartError =
+    (Boolean(balanceSheetError) && !balanceSheet) ||
+    (Boolean(convertedError) && !convertedBalanceSheet);
   const showStale = isShowingStaleDataFromQueries([
     { data: balanceSheet, error: balanceSheetError },
+    { data: convertedBalanceSheet, error: convertedError },
     { data: balanceSheetBasis, error: basisError },
     { data: pricesData, error: pricesError },
     { data: ledgerMeta, error: ledgerMetaError },
@@ -181,6 +219,7 @@ const HomeScreenImpl = (): JSX.Element => {
       await Promise.all([
         ledgerMetaRefetch(),
         balanceSheetRefetch(),
+        convertedRefetch(),
         basisRefetch(),
         pricesRefetch(),
       ]);

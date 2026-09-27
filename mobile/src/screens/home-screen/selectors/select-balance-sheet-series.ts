@@ -7,6 +7,7 @@ import {
   latestBalance,
   pointsToMonthlySeries,
 } from "../../../common/series-util";
+import { holdingsOf, type Holding } from "../../../common/balance-display";
 import {
   selectValuation,
   type ManagedSource,
@@ -88,4 +89,15 @@ export function selectLiabilitiesSeries(
     currency,
     data?.getLedgerBalanceSheet?.liabilitiesData,
   );
+}
+
+/**
+ * Net worth's native holdings — every currency the latest point actually
+ * carries, at market, before any FX conversion. Home charts net worth in one
+ * display currency (see `useDisplayCurrency`), so this is what a "€1,000 ·
+ * £6,000" native breakdown line reads from; empty while a single-currency
+ * ledger has nothing to break down.
+ */
+export function selectNetWorthHoldings(data?: BalanceSheetQuery): Holding[] {
+  return holdingsOf(latestBalance(data?.getLedgerBalanceSheet?.netWorthData));
 }
