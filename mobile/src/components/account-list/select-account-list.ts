@@ -72,19 +72,37 @@ type TreeRules = {
   ) => boolean;
 };
 
+/**
+ * The number a node's row shows and sorts by — the properly converted total
+ * when the caller has one (a second, `conversion: displayCurrency`-scoped
+ * read of the same tree), or the old single-key read otherwise. Without this,
+ * a GBP-only account read in a EUR-primary ledger fell back to
+ * `resolveCurrencyBalance`'s USD key and rendered as a bogus €0.00; with a
+ * converted read, every account's magnitude is expressed in one currency, so
+ * bars stay comparable across the tree.
+ */
+type ConvertedOf = (account: string) => number;
+
 function toNode(
   raw: RawChild,
   currency: string,
   sign: 1 | -1,
   displayName: (account: string) => string,
   rules: TreeRules,
+  convertedOf?: ConvertedOf,
 ): AccountNode {
   return {
     account: raw.account,
     name: displayName(raw.account),
-    value: sign * resolveCurrencyBalance(raw.balance_children, currency),
+    value:
+      sign *
+      (convertedOf
+        ? convertedOf(raw.account)
+        : resolveCurrencyBalance(raw.balance_children, currency)),
     children: (raw.children ?? [])
-      .map((child) => toNode(child, currency, sign, leafName, rules))
+      .map((child) =>
+        toNode(child, currency, sign, leafName, rules, convertedOf),
+      )
       .filter((node) => node.value !== 0 || rules.keep(node))
       // By magnitude: a large negative belongs next to its large siblings, not
       // sunk to the bottom of the list.
@@ -184,9 +202,10 @@ function buildTopLevel(
   currency: string,
   sign: 1 | -1,
   rules: TreeRules,
+  convertedOf?: ConvertedOf,
 ): AccountNode[] {
   const rows = topLevel
-    .map((child) => toNode(child, currency, sign, dropRoot, rules))
+    .map((child) => toNode(child, currency, sign, dropRoot, rules, convertedOf))
     .filter((accountNode) => accountNode.value !== 0 || rules.keep(accountNode))
     .sort((a, b) => Math.abs(b.value) - Math.abs(a.value))
     .map((node) => compressChain(node, rules));
@@ -401,6 +420,7 @@ export function selectAccountTreeFromRoot(
   root?: SerializableTreeNodeLike | null,
   sign: 1 | -1 = 1,
   zeroBalance: ZeroBalanceOptions = {},
+  convertedOf?: ConvertedOf,
 ): AccountNode[] {
   // A root without children is still worth walking when zero-balance accounts
   // are opted in: a ledger whose accounts are all freshly opened has an empty
@@ -418,5 +438,6 @@ export function selectAccountTreeFromRoot(
     currency,
     sign,
     treeRules(raw, currency, keep, zeroBalance.wholeBalance),
+    convertedOf,
   );
 }

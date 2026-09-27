@@ -1,6 +1,7 @@
 import { TrialBalanceQuery } from "@/generated-graphql/graphql";
 import { resolveCurrencyBalance } from "../../common/balance-util";
 import {
+  amountIn,
   BalanceDisplay,
   BalanceMap,
   selectBalanceDisplay,
@@ -69,6 +70,21 @@ function treeNodes(
   return out;
 }
 
+/** Every node of a trial balance root, keyed by account, native map included. */
+function convertedIndex(
+  data: TrialBalanceQuery | undefined,
+  key: CategoryKey,
+): Map<string, BalanceMap> {
+  const root = rootOf(data, key);
+  const index = new Map<string, BalanceMap>();
+  if (root) {
+    for (const node of treeNodes(root as TrialBalanceNode)) {
+      index.set(node.account, node.balanceChildren);
+    }
+  }
+  return index;
+}
+
 /**
  * The five root categories in conventional order, each with its total and account
  * tree — the row model behind the Accounts tab's balance table.
@@ -84,11 +100,20 @@ function treeNodes(
  * the five sum to zero only when market and cost agree; the difference is the
  * unrealized gain no account books. A category the ledger doesn't use (zero
  * total, no rows) is omitted.
+ *
+ * `converted` is a second trial-balance read, scoped to `displayCurrency` with
+ * `conversion: displayCurrency` — the server folds every holding it can into
+ * that one currency, so `category.value` and each row's sort/bar magnitude
+ * (`AccountNode.value`) are comparable across currencies. Without it (a caller
+ * that hasn't fetched the converted tree yet), this falls back to the old
+ * single-key read, which is only correct while the ledger holds one currency.
  */
 export function selectTrialBalanceCategories(
   currency: string,
   data?: TrialBalanceQuery,
   accountNames: readonly string[] = [],
+  converted?: TrialBalanceQuery,
+  displayCurrency?: string,
 ): AccountCategory[] {
   const trialBalance = data?.getLedgerTrialBalance;
   if (!currency || !trialBalance) {
@@ -97,19 +122,33 @@ export function selectTrialBalanceCategories(
 
   return CATEGORY_KEYS.map((key) => {
     const root = rootOf(data, key);
+    const convertedRoot =
+      converted && displayCurrency ? convertedIndex(converted, key) : undefined;
+    const convertedOf = convertedRoot
+      ? (account: string) =>
+          amountIn(convertedRoot.get(account), displayCurrency!).number
+      : undefined;
     return {
       key,
       account: root?.account ?? "",
-      value: resolveCurrencyBalance(root?.balanceChildren, currency),
+      value: convertedOf
+        ? convertedOf(root?.account ?? "")
+        : resolveCurrencyBalance(root?.balanceChildren, currency),
       // The Accounts view is the one caller that wants zero-balance accounts —
       // they are grafted into the hierarchy at their real level rather than
       // appended to the category after its ancestors are compressed — and the
       // one that counts unconverted holdings as part of a balance.
-      children: selectAccountTreeFromRoot(currency, root, 1, {
-        accounts: accountNames,
-        rootAccount: root?.account || ROOT_PREFIX[key],
-        wholeBalance: true,
-      }),
+      children: selectAccountTreeFromRoot(
+        currency,
+        root,
+        1,
+        {
+          accounts: accountNames,
+          rootAccount: root?.account || ROOT_PREFIX[key],
+          wholeBalance: true,
+        },
+        convertedOf,
+      ),
     };
   }).filter((category) => category.value !== 0 || category.children.length > 0);
 }
@@ -144,6 +183,14 @@ export function selectTrialBalanceAccount(
  *
  * A folded chain row takes its deepest account, whose balance the whole chain
  * shares, so looking that account up gives the row's figure.
+ *
+ * `operatingCurrencies` (from `useDisplayCurrency`'s `options`) is what tells a
+ * row's balance apart from a single commodity holding: any currency in that
+ * list reads natively (`kind: "multi"` once there's more than one, or one that
+ * isn't `currency`), everything else stays a `notInTotal` disclosure or a
+ * `units` row exactly as before. `converted` is the same `displayCurrency`-scoped
+ * second read `selectTrialBalanceCategories` takes, supplying each multi-currency
+ * row's "≈" total.
  */
 export function selectTrialBalanceDisplays(
   currency: string,
@@ -152,6 +199,8 @@ export function selectTrialBalanceDisplays(
   prices: readonly PricePair[] | undefined,
   today: string,
   managed?: readonly ManagedSource[],
+  operatingCurrencies: readonly string[] = [currency],
+  converted?: TrialBalanceQuery,
 ): Map<string, BalanceDisplay> {
   const displays = new Map<string, BalanceDisplay>();
   if (!currency || !valued?.getLedgerTrialBalance) {
@@ -163,6 +212,9 @@ export function selectTrialBalanceDisplays(
     const root = rootOf(valued, key);
     if (!root) continue;
     const unitsRoot = rootOf(units, key);
+    const convertedIndexForKey = converted
+      ? convertedIndex(converted, key)
+      : undefined;
     const rowKey = (node: TrialBalanceNode, top: TrialBalanceNode) =>
       node === top ? key : node.account;
     const unitsByRow = new Map<string, BalanceMap>(
@@ -175,11 +227,16 @@ export function selectTrialBalanceDisplays(
     );
     for (const node of treeNodes(root)) {
       const row = rowKey(node, root);
+      const convertedTotal = convertedIndexForKey
+        ? amountIn(convertedIndexForKey.get(node.account), currency).number
+        : undefined;
       const display = selectBalanceDisplay(
         node.balanceChildren,
         unitsByRow.get(row),
         currency,
         basisOf,
+        operatingCurrencies,
+        convertedTotal,
       );
       displays.set(
         row,

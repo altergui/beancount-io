@@ -61,6 +61,11 @@ export function selectAccountBalanceDisplay(
           valueBasisOf(prices, currency),
         );
   }
+  if (display.kind === "multi") {
+    // Multi-currency totals don't (yet) carry a valuation disclosure — that is
+    // only meaningful for a single-currency money figure's cost/market basis.
+    return display;
+  }
   return {
     ...display,
     valuation: selectValuation({

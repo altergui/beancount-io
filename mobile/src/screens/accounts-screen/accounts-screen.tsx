@@ -9,7 +9,9 @@ import { useThemeStyle } from "@/common/hooks";
 import { useTranslations } from "@/common/hooks/use-translations";
 import { useSession } from "@/common/hooks/use-session";
 import { getPrimaryCurrency } from "@/common/currency-util";
+import { useDisplayCurrency } from "@/common/hooks/use-display-currency";
 import { LedgerDrawerHeader, StaleDataBanner } from "@/components";
+import { CurrencySelector } from "@/components/currency-selector";
 import { LoadingTile } from "@/components/loading-tile";
 import { FadeInView } from "@/components/crossfade";
 import { AccountTable } from "@/components/account-table";
@@ -81,7 +83,15 @@ const AccountsScreenImpl = (): JSX.Element => {
     refetch: ledgerMetaRefetch,
     error: ledgerMetaError,
   } = useLedgerMeta(userId, ledgerId);
+  // The ledger's own primary currency. Every row still shows its own native
+  // holdings; `displayCurrency` below is only what the "≈ total", the sort
+  // order and the bar widths are expressed in.
   const currency = getPrimaryCurrency(currencies);
+  const {
+    currency: displayCurrency,
+    options: currencyOptions,
+    setCurrency: setDisplayCurrency,
+  } = useDisplayCurrency(ledgerId, currencies);
 
   // Commodity holdings are valued at market, as on Home, so they count toward
   // Assets rather than being dropped for lack of a cash balance.
@@ -99,11 +109,32 @@ const AccountsScreenImpl = (): JSX.Element => {
     refetch: unitsRefetch,
     error: unitsError,
   } = useTrialBalance(ledgerId, undefined, "units");
+  // A third read, folded entirely into `displayCurrency` — the only way to get
+  // a cross-currency total to sort, bar, and "≈" against (see
+  // `selectTrialBalanceCategories`).
+  const {
+    data: convertedData,
+    loading: convertedLoading,
+    refetch: convertedRefetch,
+    error: convertedError,
+  } = useTrialBalance(ledgerId, undefined, displayCurrency);
 
   const categories = useMemo(
     () =>
-      selectTrialBalanceCategories(currency, accountData, ledgerMeta?.accounts),
-    [currency, accountData, ledgerMeta?.accounts],
+      selectTrialBalanceCategories(
+        currency,
+        accountData,
+        ledgerMeta?.accounts,
+        convertedData,
+        displayCurrency,
+      ),
+    [
+      currency,
+      accountData,
+      ledgerMeta?.accounts,
+      convertedData,
+      displayCurrency,
+    ],
   );
   // Which commodities had a price: a row's value reads "at market" or "at
   // cost", and each root dates its prices the way Home's pages do.
@@ -119,14 +150,25 @@ const AccountsScreenImpl = (): JSX.Element => {
   const displays = useMemo(
     () =>
       selectTrialBalanceDisplays(
-        currency,
+        displayCurrency,
         accountData,
         unitsData,
         prices,
         today,
         managed,
+        currencyOptions,
+        convertedData,
       ),
-    [currency, accountData, unitsData, prices, today, managed],
+    [
+      displayCurrency,
+      accountData,
+      unitsData,
+      prices,
+      today,
+      managed,
+      currencyOptions,
+      convertedData,
+    ],
   );
 
   const handleOpenAccount = useCallback(() => {
@@ -141,6 +183,7 @@ const AccountsScreenImpl = (): JSX.Element => {
         ledgerMetaRefetch(),
         accountsRefetch(),
         unitsRefetch(),
+        convertedRefetch(),
         pricesRefetch(),
       ]);
     } finally {
@@ -154,10 +197,12 @@ const AccountsScreenImpl = (): JSX.Element => {
   const accountsPending =
     (accountsLoading && !accountData) ||
     (unitsLoading && !unitsData && !unitsError) ||
+    (convertedLoading && !convertedData && !convertedError) ||
     (pricesLoading && !pricesData && !pricesError);
   const showStale = isShowingStaleDataFromQueries([
     { data: accountData, error: accountsError },
     { data: unitsData, error: unitsError },
+    { data: convertedData, error: convertedError },
     { data: pricesData, error: pricesError },
     { data: ledgerMeta, error: ledgerMetaError },
   ]);
@@ -196,11 +241,18 @@ const AccountsScreenImpl = (): JSX.Element => {
         <FadeInView fill>
           <AccountTable
             categories={categories}
-            currency={currency}
+            currency={displayCurrency}
             displays={displays}
             refreshing={refreshing}
             onRefresh={onRefresh}
             onPressAccount={handlePressAccount}
+            belowHeader={
+              <CurrencySelector
+                currency={displayCurrency}
+                options={currencyOptions}
+                onChange={setDisplayCurrency}
+              />
+            }
           />
         </FadeInView>
       )}

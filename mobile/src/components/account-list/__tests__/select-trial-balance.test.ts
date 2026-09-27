@@ -599,3 +599,117 @@ describe("selectTrialBalanceCategories with unconverted holdings", () => {
     ).toEqual(["Hoogle:Checking", "Cash"]);
   });
 });
+
+describe("selectTrialBalanceCategories with a converted read", () => {
+  it("uses the converted total instead of the native-key read", () => {
+    // A GBP-only account read in a EUR-primary ledger: the native map has no
+    // EUR key at all, so the old single-key read would fall back to a bogus
+    // USD lookup and read as zero. The converted (server-side FX) read carries
+    // the real EUR-equivalent total.
+    const native = createTrialBalance({
+      assets: {
+        account: "Assets",
+        total: { EUR: "1000", GBP: "6000" },
+        children: [
+          { account: "Assets:BankUS", balanceChildren: { GBP: "6000" } },
+          { account: "Assets:BankEU", balanceChildren: { EUR: "1000" } },
+        ],
+      },
+    });
+    const converted = createTrialBalance({
+      assets: {
+        account: "Assets",
+        total: { EUR: "2000" },
+        children: [
+          { account: "Assets:BankUS", balanceChildren: { EUR: "1000" } },
+          { account: "Assets:BankEU", balanceChildren: { EUR: "1000" } },
+        ],
+      },
+    });
+    const [assets] = selectTrialBalanceCategories(
+      "EUR",
+      native,
+      [],
+      converted,
+      "EUR",
+    );
+    expect(assets.value).toBe(2000);
+    expect(
+      assets.children.find((node) => node.name === "BankUS")?.value,
+    ).toBe(1000);
+    expect(assets.children.find((node) => node.name === "BankEU")?.value).toBe(
+      1000,
+    );
+  });
+});
+
+describe("selectTrialBalanceDisplays with multiple currencies", () => {
+  it("reads a GBP+EUR account as a multi-currency display with its converted total", () => {
+    const native = createTrialBalance({
+      assets: {
+        account: "Assets",
+        total: { EUR: "1000", GBP: "6000" },
+        children: [
+          {
+            account: "Assets:Mixed",
+            balanceChildren: { EUR: "500", GBP: "3000" },
+          },
+        ],
+      },
+    });
+    const converted = createTrialBalance({
+      assets: {
+        account: "Assets",
+        total: { EUR: "1500" },
+        children: [
+          { account: "Assets:Mixed", balanceChildren: { EUR: "750" } },
+        ],
+      },
+    });
+    const displays = selectTrialBalanceDisplays(
+      "EUR",
+      native,
+      undefined,
+      undefined,
+      "2026-01-01",
+      undefined,
+      ["EUR", "GBP"],
+      converted,
+    );
+    expect(displays.get("Assets:Mixed")).toEqual({
+      kind: "multi",
+      holdings: [
+        { currency: "EUR", number: 500, scale: 0 },
+        { currency: "GBP", number: 3000, scale: 0 },
+      ],
+      converted: 750,
+      notInTotal: [],
+    });
+  });
+
+  it("keeps a single-currency account a plain money display", () => {
+    const native = createTrialBalance({
+      assets: {
+        account: "Assets",
+        total: { EUR: "1000" },
+        children: [
+          { account: "Assets:BankEU", balanceChildren: { EUR: "1000" } },
+        ],
+      },
+    });
+    const displays = selectTrialBalanceDisplays(
+      "EUR",
+      native,
+      undefined,
+      undefined,
+      "2026-01-01",
+      undefined,
+      ["EUR", "GBP"],
+    );
+    expect(displays.get("Assets:BankEU")).toEqual({
+      kind: "money",
+      value: 1000,
+      notInTotal: [],
+    });
+  });
+});

@@ -1,4 +1,11 @@
-import { memo, useCallback, useMemo, useRef, useState } from "react";
+import {
+  memo,
+  useCallback,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { useScrollToTop } from "expo-router";
 import {
   FlatList,
@@ -303,26 +310,55 @@ const AccountTableRow = memo(function AccountTableRow({
   // too: left to wrap, the sign strands on its own line above the figure
   // (w1/034). Same fit props as the hero amounts — shrink, never wrap,
   // never ellipsize.
-  const amountBlock = (
-    <View style={[styles.amounts, stacked && styles.stackedAmounts]}>
-      <AmountText
-        mono={isCategory ? "medium" : "regular"}
-        style={valueStyle}
-        {...HERO_AMOUNT_FIT}
-      >
-        {units
-          ? formatHolding(units)
-          : formatSignedMoneyWithCurrency(row.value, currency)}
-      </AmountText>
-      {display
-        ? balanceNotes(display, currency, t, locale).map((note) => (
-            <Text key={note} style={styles.amountNote}>
-              {note}
-            </Text>
-          ))
-        : null}
-    </View>
-  );
+  const amountBlock =
+    display?.kind === "multi" ? (
+      <View style={[styles.amounts, stacked && styles.stackedAmounts]}>
+        {display.holdings.map((holding) => (
+          <AmountText
+            key={holding.currency}
+            mono={isCategory ? "medium" : "regular"}
+            style={valueStyle}
+            {...HERO_AMOUNT_FIT}
+          >
+            {formatHolding(holding, false)}
+          </AmountText>
+        ))}
+        {display.converted !== undefined ? (
+          <Text style={styles.amountNote}>
+            {t("approxTotal", {
+              amount: formatSignedMoneyWithCurrency(
+                display.converted,
+                currency,
+              ),
+            })}
+          </Text>
+        ) : null}
+        {balanceNotes(display, currency, t, locale).map((note) => (
+          <Text key={note} style={styles.amountNote}>
+            {note}
+          </Text>
+        ))}
+      </View>
+    ) : (
+      <View style={[styles.amounts, stacked && styles.stackedAmounts]}>
+        <AmountText
+          mono={isCategory ? "medium" : "regular"}
+          style={valueStyle}
+          {...HERO_AMOUNT_FIT}
+        >
+          {units
+            ? formatHolding(units)
+            : formatSignedMoneyWithCurrency(row.value, currency)}
+        </AmountText>
+        {display
+          ? balanceNotes(display, currency, t, locale).map((note) => (
+              <Text key={note} style={styles.amountNote}>
+                {note}
+              </Text>
+            ))
+          : null}
+      </View>
+    );
 
   const guides = Array.from({ length: row.depth }, (_, level) => (
     <View key={level} style={styles.guide}>
@@ -438,6 +474,12 @@ type AccountTableProps = {
   onRefresh: () => void;
   /** Tapping an account row drills into it; the chevron still toggles. */
   onPressAccount?: (account: string) => void;
+  /**
+   * Rendered inside the scrollable header, right under the column labels —
+   * the display-currency selector for the "≈ total" column, when the caller
+   * has one to offer.
+   */
+  belowHeader?: ReactNode;
 };
 
 /**
@@ -455,6 +497,7 @@ export function AccountTable({
   refreshing,
   onRefresh,
   onPressAccount,
+  belowHeader,
 }: AccountTableProps): JSX.Element {
   const listRef = useRef<FlatList<TableRow>>(null);
   useScrollToTop(listRef);
@@ -502,12 +545,15 @@ export function AccountTable({
       renderItem={renderItem}
       keyExtractor={(row) => row.key}
       ListHeaderComponent={
-        <View style={styles.columnHeader}>
-          <Text style={styles.columnLabel}>{t("account")}</Text>
-          {/* The basis is each root's to state: roots that value holdings
-              say so with their price date, cash-only ones say nothing. */}
-          <Text style={styles.columnLabelRight}>{t("balance")}</Text>
-        </View>
+        <>
+          <View style={styles.columnHeader}>
+            <Text style={styles.columnLabel}>{t("account")}</Text>
+            {/* The basis is each root's to state: roots that value holdings
+                say so with their price date, cash-only ones say nothing. */}
+            <Text style={styles.columnLabelRight}>{t("balance")}</Text>
+          </View>
+          {belowHeader}
+        </>
       }
       ListEmptyComponent={<Text style={styles.empty}>{t("noAccounts")}</Text>}
       refreshControl={
