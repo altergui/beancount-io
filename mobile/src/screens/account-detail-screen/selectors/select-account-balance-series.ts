@@ -30,6 +30,13 @@ import {
  * Any other balance is the chart's headline, the report's latest point, so it
  * carries what that total discloses about its basis (see `selectValuation`),
  * dated like that point.
+ *
+ * `operatingCurrencies` (from `useDisplayCurrency`'s `options`) and
+ * `convertedTotal` (a second, `currency`-scoped trial balance read for this
+ * account) are the same pair `selectTrialBalanceDisplays` takes for an
+ * Accounts row — passing them through is what lets a balance holding more
+ * than one native currency read as `kind: "multi"` here too, with an "≈"
+ * total, instead of folding (or silently mislabeling) one currency's figure.
  */
 export function selectAccountBalanceDisplay(
   currency: string,
@@ -39,6 +46,8 @@ export function selectAccountBalanceDisplay(
   today: string,
   current?: BalanceMap,
   managed?: readonly ManagedSource[],
+  operatingCurrencies: readonly string[] = [currency],
+  convertedTotal?: number,
 ): BalanceDisplay {
   const points = valued?.getLedgerAccountReport?.linechartData;
   const latest = points?.[points.length - 1];
@@ -50,6 +59,7 @@ export function selectAccountBalanceDisplay(
     unitsBalance,
     currency,
     valueBasisOf(prices, currency, latest?.date),
+    operatingCurrencies,
   );
   if (display.kind === "units") {
     return current === undefined || current === null
@@ -59,12 +69,23 @@ export function selectAccountBalanceDisplay(
           unitsBalance,
           currency,
           valueBasisOf(prices, currency),
+          operatingCurrencies,
         );
   }
   if (display.kind === "multi") {
-    // Multi-currency totals don't (yet) carry a valuation disclosure — that is
-    // only meaningful for a single-currency money figure's cost/market basis.
-    return display;
+    // Reread from the Accounts tab's own market read (`current`), same as
+    // `units` above, so the header matches its row exactly, with the
+    // display-currency converted total folded in.
+    return current === undefined || current === null
+      ? { ...display, converted: convertedTotal }
+      : selectBalanceDisplay(
+          current,
+          unitsBalance,
+          currency,
+          valueBasisOf(prices, currency),
+          operatingCurrencies,
+          convertedTotal,
+        );
   }
   return {
     ...display,

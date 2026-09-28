@@ -14,7 +14,7 @@ import { fontSizes, fontWeights, useTheme } from "@/common/theme";
 import { useThemeStyle } from "@/common/hooks";
 import { useTranslations } from "@/common/hooks/use-translations";
 import { useSession } from "@/common/hooks/use-session";
-import { getPrimaryCurrency } from "@/common/currency-util";
+import { useDisplayCurrency } from "@/common/hooks/use-display-currency";
 import { BalanceChartCard } from "@/components";
 import { LedgerGuard, useLedgerGuard } from "@/components/ledger-guard";
 import { ThemedRefreshControl } from "@/components/dashboard-scroll-view";
@@ -30,7 +30,13 @@ import { BALANCE_CONVERSION } from "@/common/balance-util";
 import { balanceNotes } from "@/common/valuation";
 import { useLedgerPrices } from "@/common/hooks/use-ledger-prices";
 import { getFormatDate } from "@/common/format-util";
-import { formatUnits } from "@/common/number-utils";
+import {
+  formatSignedMoneyWithCurrency,
+  formatUnits,
+} from "@/common/number-utils";
+import { amountIn, formatHolding } from "@/common/balance-display";
+import { AmountText } from "@/components/amount-text";
+import { HERO_AMOUNT_FIT } from "@/components/amount-text/hero-amount-fit";
 import {
   selectAccountBalanceDisplay,
   selectAccountBalanceSeries,
@@ -115,6 +121,24 @@ const getStyles = (theme: ColorTheme) =>
     chartContainer: {
       paddingHorizontal: 10,
     },
+    // The multi-currency header block above the chart: native holdings stacked
+    // leading-aligned, mirroring the Accounts row's own amount column but
+    // full-width rather than right-aligned against a label.
+    headerAmounts: {
+      alignItems: "flex-start",
+      paddingHorizontal: 16,
+      paddingTop: 4,
+      gap: 2,
+    },
+    headerAmount: {
+      fontSize: fontSizes.xxl,
+      fontWeight: fontWeights.medium,
+      color: theme.text01,
+    },
+    headerAmountNote: {
+      fontSize: fontSizes.sm,
+      color: theme.black60,
+    },
   });
 
 const AccountDetailScreenImpl = ({
@@ -135,7 +159,13 @@ const AccountDetailScreenImpl = ({
     userId,
     ledgerId,
   );
-  const currency = getPrimaryCurrency(currencies);
+  // Same policy as Accounts: every figure shows its native holding(s), and
+  // `currency` is only what the "≈ total" and the chart (when the account
+  // holds more than one native currency) convert into.
+  const {
+    currency,
+    options: currencyOptions,
+  } = useDisplayCurrency(ledgerId, currencies);
 
   const {
     data: reportData,
@@ -171,8 +201,37 @@ const AccountDetailScreenImpl = ({
     loading: accountsLoading,
     refetch: accountsRefetch,
   } = useTrialBalance(ledgerId);
+  // A second trial balance, folded entirely into `currency` — the same
+  // `displayCurrency`-scoped read Accounts takes for its "≈" total (see
+  // `selectTrialBalanceCategories`), scoped down to this one account.
+  const {
+    data: convertedAccountsData,
+    loading: convertedAccountsLoading,
+    refetch: convertedAccountsRefetch,
+  } = useTrialBalance(ledgerId, undefined, currency);
+  const convertedTotal = useMemo(
+    () =>
+      convertedAccountsData === undefined
+        ? undefined
+        : amountIn(
+            selectTrialBalanceAccount(convertedAccountsData, account),
+            currency,
+          ).number,
+    [convertedAccountsData, account, currency],
+  );
+  // A third account report, also folded into `currency` — the chart's series
+  // when the account holds more than one native currency (see below); unused,
+  // but harmless to fetch, when it holds exactly one.
+  const {
+    data: convertedReportData,
+    loading: convertedReportLoading,
+    error: convertedReportError,
+    refetch: convertedReportRefetch,
+  } = useAccountReport(ledgerId, account, undefined, undefined, currency);
   const valuationPending =
-    (pricesLoading && !pricesData) || (accountsLoading && !accountsData);
+    (pricesLoading && !pricesData) ||
+    (accountsLoading && !accountsData) ||
+    (convertedAccountsLoading && !convertedAccountsData);
   const today = useMemo(() => getFormatDate(new Date()), []);
   const display = useMemo(
     () =>
@@ -184,6 +243,8 @@ const AccountDetailScreenImpl = ({
         today,
         selectTrialBalanceAccount(accountsData, account),
         managed,
+        currencyOptions,
+        convertedTotal,
       ),
     [
       currency,
@@ -194,12 +255,35 @@ const AccountDetailScreenImpl = ({
       accountsData,
       account,
       managed,
+      currencyOptions,
+      convertedTotal,
     ],
   );
   const units = display.kind === "units" ? display.units : null;
   const unitsCurrency = units?.currency;
   const unitsScale = units?.scale;
   const journalConversion = unitsCurrency ? "units" : BALANCE_CONVERSION;
+  // A balance holding exactly one native (fiat) currency charts in that
+  // currency unconverted — `reportData` is already read `at_value`, with no
+  // FX between currencies, so it is correct as-is. Two or more native
+  // currencies chart in `currency`, from the display-currency-converted read.
+  const singleNativeCurrency =
+    display.kind === "multi" && display.holdings.length === 1
+      ? display.holdings[0].currency
+      : undefined;
+  const chartCurrency = unitsCurrency ?? singleNativeCurrency ?? currency;
+  const chartReportData = unitsCurrency
+    ? unitsReportData
+    : singleNativeCurrency
+      ? reportData
+      : convertedReportData;
+  const chartReportError = unitsCurrency
+    ? unitsReportError
+    : singleNativeCurrency
+      ? reportError
+      : convertedReportError;
+  const convertedReportPending =
+    convertedReportLoading && !convertedReportData;
 
   const {
     data: journalData,
@@ -221,8 +305,8 @@ const AccountDetailScreenImpl = ({
     () =>
       unitsCurrency
         ? selectAccountUnitsSeries(unitsCurrency, unitsReportData)
-        : selectAccountBalanceSeries(currency, reportData),
-    [currency, reportData, unitsCurrency, unitsReportData],
+        : selectAccountBalanceSeries(chartCurrency, chartReportData),
+    [unitsCurrency, unitsReportData, chartCurrency, chartReportData],
   );
   const formatChartValue = useMemo(
     () =>
@@ -345,9 +429,11 @@ const AccountDetailScreenImpl = ({
         ledgerMetaRefetch(),
         reportRefetch(),
         unitsReportRefetch(),
+        convertedReportRefetch(),
         journalRefetch(),
         pricesRefetch(),
         accountsRefetch(),
+        convertedAccountsRefetch(),
       ]);
     } finally {
       setRefreshing(false);
@@ -389,17 +475,46 @@ const AccountDetailScreenImpl = ({
         >
           {account}
         </Text>
+        {display.kind === "multi" ? (
+          <View style={styles.headerAmounts}>
+            {display.holdings.map((holding) => (
+              <AmountText
+                key={holding.currency}
+                mono="medium"
+                style={styles.headerAmount}
+                {...HERO_AMOUNT_FIT}
+              >
+                {formatHolding(holding, false)}
+              </AmountText>
+            ))}
+            {display.converted !== undefined ? (
+              <Text style={styles.headerAmountNote}>
+                {t("approxTotal", {
+                  amount: formatSignedMoneyWithCurrency(
+                    display.converted,
+                    currency,
+                  ),
+                })}
+              </Text>
+            ) : null}
+          </View>
+        ) : null}
         <View style={styles.chartContainer}>
           <BalanceChartCard
             label={chartLabel}
-            currency={unitsCurrency ?? currency}
+            currency={chartCurrency}
             formatValue={formatChartValue}
             series={balanceSeries}
             // Skeleton only on first load: a pull-to-refresh keeps the chart
             // visible under the RefreshControl spinner rather than collapsing
             // it back to a tile.
-            loading={reportPending || unitsReportPending || valuationPending}
-            error={Boolean(unitsCurrency ? unitsReportError : reportError)}
+            loading={
+              reportPending ||
+              unitsReportPending ||
+              convertedReportPending ||
+              valuationPending
+            }
+            error={Boolean(chartReportError)}
           />
         </View>
         <Text style={styles.sectionTitle}>{t("transactions")}</Text>
@@ -409,16 +524,20 @@ const AccountDetailScreenImpl = ({
       t,
       chartLabel,
       currency,
-      unitsCurrency,
+      chartCurrency,
+      display,
       formatChartValue,
       balanceSeries,
       reportPending,
       unitsReportPending,
+      convertedReportPending,
       valuationPending,
-      reportError,
-      unitsReportError,
+      chartReportError,
       styles.sectionTitle,
       styles.accountPath,
+      styles.headerAmounts,
+      styles.headerAmount,
+      styles.headerAmountNote,
       account,
     ],
   );
