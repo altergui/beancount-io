@@ -9,6 +9,7 @@ import {
   directiveTypeLabelKey,
 } from "../select-account-journal";
 import { en } from "../../../../translations/en";
+import { formatAccountJournalChange } from "../../utils/format-account-journal-balance";
 
 /** Build a display row directly (used by groupAccountJournalRowsToSections tests). */
 function row(
@@ -17,6 +18,7 @@ function row(
   change: number,
   balance: number,
   flag?: string,
+  moneyCurrency?: string,
 ): AccountJournalRow {
   return {
     key: `${date}-${title}`,
@@ -26,6 +28,7 @@ function row(
     balance,
     flag,
     postings: [],
+    moneyCurrency,
   };
 }
 
@@ -132,8 +135,22 @@ describe("selectAccountJournalRows", () => {
         change: -4.5,
         balance: 120.5,
         moneyScale: 1,
+        moneyCurrency: "USD",
       },
     ]);
+  });
+
+  it("reads a row in the account's own currency when it isn't the active one — never the old USD fallback", () => {
+    const [row] = selectAccountJournalRows("EUR", [
+      item(
+        { entry_hash: "b", date: "2025-03-01", payee: "Bakery" },
+        { GBP: -25 },
+        { GBP: 340 },
+      ),
+    ]);
+    expect(row.change).toBe(-25);
+    expect(row.balance).toBe(340);
+    expect(row.moneyCurrency).toBe("GBP");
   });
 
   it("carries recorded scale from decimal strings for operating-currency rows", () => {
@@ -261,6 +278,15 @@ describe("groupAccountJournalRowsToSections", () => {
       "USD",
     );
     expect(negative.totalChange).toBe("-$4.50");
+
+    const [foreign] = groupAccountJournalRowsToSections(
+      [row("2025-03-01", "Bakery", -25, 340, undefined, "GBP")],
+      "EUR",
+    );
+    // The section is GBP-only — the total reads in that native currency, the
+    // account's own `moneyCurrency`, not the screen's (possibly different)
+    // display currency.
+    expect(foreign.totalChange).toBe(formatAccountJournalChange(-25, "GBP"));
 
     const [zero] = groupAccountJournalRowsToSections(
       [row("2025-01-03", "Balance", 0, 95.5)],

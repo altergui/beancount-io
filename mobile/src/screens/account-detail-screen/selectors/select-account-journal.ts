@@ -1,7 +1,6 @@
 import { AccountJournalQuery } from "@/generated-graphql/graphql";
 import { PostingLite } from "@/common/tx-category";
-import { operatingKey } from "../../../common/balance-util";
-import { amountIn } from "../../../common/balance-display";
+import { amountIn, holdingsOf } from "../../../common/balance-display";
 import { formatUnits } from "../../../common/number-utils";
 import { formatAccountJournalChange } from "../utils/format-account-journal-balance";
 import { formatLedgerDate } from "../../../common/date-format";
@@ -34,6 +33,13 @@ export type AccountJournalRow = {
   balance: number;
   /** Recorded scale for operating-currency rows; drives journal amount formatting. */
   moneyScale?: number;
+  /**
+   * The currency `change`/`balance` actually read in, for a non-`units` row:
+   * the screen's display currency when the account holds it, else the
+   * account's own native currency — never a silent USD fallback, which used
+   * to mislabel a GBP-only account's entries as `€0.00`.
+   */
+  moneyCurrency?: string;
   /**
    * Set when the account reads in its commodity's units (see
    * `selectBalanceDisplay`): `change` and `balance` are then amounts of
@@ -207,7 +213,10 @@ export function groupAccountJournalRowsToSections(
         )
       : formatAccountJournalChange(
           net,
-          currency,
+          // Every row in a section belongs to the same account, so they share
+          // one `moneyCurrency` — read from the first rather than falling
+          // back to the screen's (possibly different) display currency.
+          data[0].moneyCurrency ?? currency,
           Math.max(...data.map((r) => r.moneyScale ?? 2)),
         );
     return {
@@ -272,7 +281,12 @@ export function selectAccountJournalRows(
       directiveType: asString(item.entry.directive_type) || undefined,
     };
     if (!units) {
-      const key = operatingKey(item.change, currency);
+      // `currency` when the account holds it, else its own (single) native
+      // currency — read strictly, with no USD fallback (see `moneyCurrency`).
+      const key =
+        item.change && currency in item.change
+          ? currency
+          : (holdingsOf(item.change)[0]?.currency ?? currency);
       const change = amountIn(item.change, key);
       const balance = amountIn(item.balance, key);
       return {
@@ -280,6 +294,7 @@ export function selectAccountJournalRows(
         change: change.number,
         balance: balance.number,
         moneyScale: Math.max(change.scale, balance.scale),
+        moneyCurrency: key,
       };
     }
     const change = amountIn(item.change, units.currency);

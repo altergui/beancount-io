@@ -95,12 +95,25 @@ export function AccountEntryRow({
   const isPending = row.flag === "!";
   // A commodity account's rows read in its units, with what each change cost.
   const { units } = row;
+  // `moneyCurrency` is the account's own native currency when it differs from
+  // the screen's display currency (see `selectAccountJournalRows`) — reading
+  // it here, rather than always `currency`, is what keeps a GBP-only
+  // account's entries from being mislabeled `€0.00`.
+  const moneyCurrency = row.moneyCurrency ?? currency;
   const changeText = units
     ? formatUnits(row.change, units.currency, units.scale, true)
-    : formatAccountJournalChange(row.change, currency, row.moneyScale ?? 2);
+    : formatAccountJournalChange(
+        row.change,
+        moneyCurrency,
+        row.moneyScale ?? 2,
+      );
   const balanceText = units
     ? formatUnits(row.balance, units.currency, units.scale)
-    : formatAccountJournalBalance(row.balance, currency, row.moneyScale ?? 2);
+    : formatAccountJournalBalance(
+        row.balance,
+        moneyCurrency,
+        row.moneyScale ?? 2,
+      );
   // Open / Balance / Pad / … rows read as plain transactions otherwise: the
   // title falls back to the directive's own account name.
   const typeLabelKey = directiveTypeLabelKey(row.directiveType);
