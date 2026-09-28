@@ -188,6 +188,9 @@ export const ca: Translations = {
   account: "Compte",
   atCost: "{{amount}} a cost",
   notInTotal: "No inclòs al total: {{amounts}}",
+  displayCurrency: "Moneda de visualització",
+  approxTotal: "≈ {{amount}}",
+  notConverted: "No convertit: {{amounts}}",
   atMarket: "{{amount}} a valor de mercat",
   atMarketValue: "A valor de mercat",
   pricesNotUpdatedSince: {

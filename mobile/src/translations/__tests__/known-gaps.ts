@@ -37,6 +37,8 @@ export const UNTRANSLATABLE: Record<string, string> = {
     "An example ledger slug (my-book); kept identical so the format stays recognizable.",
   merchantDetailDateRange:
     "Date span template; the filled-in dates are already locale-formatted, and the en-dash separator is the same in every language.",
+  approxTotal:
+    "Just the ≈ sign and the already-localized amount placeholder — no words to translate.",
 };
 
 /**

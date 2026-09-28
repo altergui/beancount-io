@@ -187,6 +187,9 @@ export const sk: Translations = {
   account: "Účet",
   atCost: "{{amount}} v obstarávacej cene",
   notInTotal: "Nie je v súčte: {{amounts}}",
+  displayCurrency: "Zobrazovacia mena",
+  approxTotal: "≈ {{amount}}",
+  notConverted: "Neprevedené: {{amounts}}",
   atMarket: "{{amount}} v trhovej hodnote",
   atMarketValue: "V trhovej hodnote",
   pricesNotUpdatedSince: {

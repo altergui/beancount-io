@@ -183,6 +183,9 @@ export const nl: Translations = {
   account: "Account",
   atCost: "{{amount}} tegen kostprijs",
   notInTotal: "Niet in totaal: {{amounts}}",
+  displayCurrency: "Weergavevaluta",
+  approxTotal: "≈ {{amount}}",
+  notConverted: "Niet omgerekend: {{amounts}}",
   atMarket: "{{amount}} tegen marktwaarde",
   atMarketValue: "Tegen marktwaarde",
   pricesNotUpdatedSince: {

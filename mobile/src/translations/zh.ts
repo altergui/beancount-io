@@ -168,6 +168,9 @@ export const zh: Translations = {
   account: "账户",
   atCost: "成本 {{amount}}",
   notInTotal: "未计入合计：{{amounts}}",
+  displayCurrency: "显示货币",
+  approxTotal: "≈ {{amount}}",
+  notConverted: "未转换：{{amounts}}",
   atMarket: "市值 {{amount}}",
   atMarketValue: "按市值计",
   pricesNotUpdatedSince: {

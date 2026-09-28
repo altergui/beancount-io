@@ -181,6 +181,9 @@ export const fa: Translations = {
   account: "حساب",
   atCost: "{{amount}} به بهای تمام‌شده",
   notInTotal: "در جمع لحاظ نشده: {{amounts}}",
+  displayCurrency: "ارز نمایش",
+  approxTotal: "≈ {{amount}}",
+  notConverted: "تبدیل‌نشده: {{amounts}}",
   atMarket: "{{amount}} به ارزش بازار",
   atMarketValue: "به ارزش بازار",
   pricesNotUpdatedSince: {

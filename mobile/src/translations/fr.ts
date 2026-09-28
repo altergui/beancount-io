@@ -186,6 +186,9 @@ export const fr: Translations = {
   account: "Compte",
   atCost: "{{amount}} au coût",
   notInTotal: "Hors total : {{amounts}}",
+  displayCurrency: "Devise d'affichage",
+  approxTotal: "≈ {{amount}}",
+  notConverted: "Non converti : {{amounts}}",
   atMarket: "{{amount}} à la valeur de marché",
   atMarketValue: "À la valeur de marché",
   pricesNotUpdatedSince: {

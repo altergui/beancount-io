@@ -162,10 +162,10 @@ const AccountDetailScreenImpl = ({
   // Same policy as Accounts: every figure shows its native holding(s), and
   // `currency` is only what the "≈ total" and the chart (when the account
   // holds more than one native currency) convert into.
-  const {
-    currency,
-    options: currencyOptions,
-  } = useDisplayCurrency(ledgerId, currencies);
+  const { currency, options: currencyOptions } = useDisplayCurrency(
+    ledgerId,
+    currencies,
+  );
 
   const {
     data: reportData,
@@ -282,8 +282,7 @@ const AccountDetailScreenImpl = ({
     : singleNativeCurrency
       ? reportError
       : convertedReportError;
-  const convertedReportPending =
-    convertedReportLoading && !convertedReportData;
+  const convertedReportPending = convertedReportLoading && !convertedReportData;
 
   const {
     data: journalData,

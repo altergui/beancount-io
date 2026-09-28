@@ -186,6 +186,9 @@ export const uk: Translations = {
   account: "Рахунок",
   atCost: "{{amount}} за собівартістю",
   notInTotal: "Не входить до підсумку: {{amounts}}",
+  displayCurrency: "Валюта відображення",
+  approxTotal: "≈ {{amount}}",
+  notConverted: "Не конвертовано: {{amounts}}",
   atMarket: "{{amount}} за ринковою вартістю",
   atMarketValue: "За ринковою вартістю",
   pricesNotUpdatedSince: {

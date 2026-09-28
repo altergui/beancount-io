@@ -184,6 +184,9 @@ export const bg: Translations = {
   account: "Сметка",
   atCost: "{{amount}} по себестойност",
   notInTotal: "Не е включено в общата сума: {{amounts}}",
+  displayCurrency: "Валута за показване",
+  approxTotal: "≈ {{amount}}",
+  notConverted: "Неконвертирано: {{amounts}}",
   atMarket: "{{amount}} по пазарна стойност",
   atMarketValue: "По пазарна стойност",
   pricesNotUpdatedSince: {

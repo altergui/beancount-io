@@ -187,6 +187,9 @@ export const ru: Translations = {
   account: "Счёт",
   atCost: "{{amount}} по себестоимости",
   notInTotal: "Не входит в итог: {{amounts}}",
+  displayCurrency: "Валюта отображения",
+  approxTotal: "≈ {{amount}}",
+  notConverted: "Не конвертировано: {{amounts}}",
   atMarket: "{{amount}} по рыночной стоимости",
   atMarketValue: "По рыночной стоимости",
   pricesNotUpdatedSince: {

@@ -186,6 +186,9 @@ export const es: Translations = {
   account: "Cuenta",
   atCost: "{{amount}} al costo",
   notInTotal: "No incluido en el total: {{amounts}}",
+  displayCurrency: "Moneda de visualización",
+  approxTotal: "≈ {{amount}}",
+  notConverted: "No convertido: {{amounts}}",
   atMarket: "{{amount}} a valor de mercado",
   atMarketValue: "A valor de mercado",
   pricesNotUpdatedSince: {
