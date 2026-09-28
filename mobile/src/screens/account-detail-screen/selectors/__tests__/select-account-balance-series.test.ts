@@ -131,6 +131,74 @@ describe("selectAccountBalanceDisplay", () => {
       false,
     );
   });
+
+  it("reads a GBP-only account as kind: multi, not €0.00, once EUR joins the operating currencies", () => {
+    const brlOnly = createReport([
+      { date: "2025-01-31", balance: { GBP: "5000" } },
+    ]);
+    const display = selectAccountBalanceDisplay(
+      "EUR",
+      brlOnly,
+      createReport([]),
+      [],
+      TODAY,
+      { GBP: "5000" },
+      undefined,
+      ["EUR", "GBP"],
+      920.5,
+    );
+    expect(display).toEqual({
+      kind: "multi",
+      holdings: [{ currency: "GBP", number: 5000, scale: 0 }],
+      converted: 920.5,
+      notInTotal: [],
+    });
+  });
+
+  it("re-reads a multi-currency balance from the Accounts row (`current`), same as units", () => {
+    const held = createReport([
+      { date: "2025-01-31", balance: { EUR: "100", GBP: "5000" } },
+    ]);
+    const display = selectAccountBalanceDisplay(
+      "EUR",
+      held,
+      createReport([]),
+      [],
+      TODAY,
+      // `current` disagrees with the report's latest point — the row wins.
+      { EUR: "150", GBP: "6000" },
+      undefined,
+      ["EUR", "GBP"],
+      1150,
+    );
+    expect(display).toEqual({
+      kind: "multi",
+      holdings: [
+        { currency: "EUR", number: 150, scale: 0 },
+        { currency: "GBP", number: 6000, scale: 0 },
+      ],
+      converted: 1150,
+      notInTotal: [],
+    });
+  });
+
+  it("without operatingCurrencies, still reads a single non-display currency as before (default [currency])", () => {
+    const brlOnly = createReport([
+      { date: "2025-01-31", balance: { GBP: "5000" } },
+    ]);
+    const display = selectAccountBalanceDisplay(
+      "EUR",
+      brlOnly,
+      createReport([]),
+      [],
+      TODAY,
+      { GBP: "5000" },
+    );
+    // GBP isn't in `units` and isn't `operatingCurrencies` (default [EUR]), so
+    // it reads in its own units, exactly as a stock holding would.
+    expect(display.kind).toBe("units");
+    expect(display.kind === "units" && display.units.currency).toBe("GBP");
+  });
 });
 
 describe("selectAccountUnitsSeries", () => {
