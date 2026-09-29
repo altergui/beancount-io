@@ -11,7 +11,13 @@
 
  # Install dependencies (generate lockfile if needed)
  # Note: Peer dependency warnings for @as-integrations/koa are expected and non-blocking
- RUN yarn install
+ # promptfoo (devDependency, used only by manual `yarn eval:*`) pulls in
+ # Playwright, which otherwise downloads ~650MB of browser binaries that this
+ # container never runs.
+ ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+ # Clean the yarn download cache in the same layer -- otherwise it's baked into
+ # the image permanently (was ~9.3GB of the ~20GB image; real node_modules is ~3GB).
+ RUN yarn install && yarn cache clean
 
  # Copy source code
  COPY . .
