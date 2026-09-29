@@ -66,19 +66,24 @@ export type BalanceDisplay =
   | {
       kind: "multi";
       /**
-       * Every fiat holding this balance carries, shown natively rather than
-       * folded into one total — the display currency first (when held), then
-       * the rest by descending magnitude.
+       * Every operating-currency holding this balance carries, shown natively
+       * rather than folded into one total — the display currency first (when
+       * held), then the rest by descending magnitude. Empty when the balance
+       * holds only currencies the ledger never declared operating (a USD or
+       * JPY account in a EUR/GBP ledger): there is no native line to draw,
+       * only the converted total below.
        */
       holdings: Holding[];
       /**
        * The server-converted total in the display currency, when the caller
        * has one to offer (a second, `displayCurrency`-scoped read of the same
        * balance). Shown as "≈" under the native holdings; absent while that
-       * read hasn't landed yet.
+       * read hasn't landed yet. It is the ONLY figure shown when `holdings` is
+       * empty, so that case reads as "here's what this is worth converted",
+       * not a bogus zero.
        */
       converted?: number;
-      /** Non-fiat holdings (stock, vacation hours) the total still excludes. */
+      /** Non-operating holdings (a priced-but-not-operating currency, a stock, vacation hours) the total still excludes. */
       notInTotal: Holding[];
     };
 
@@ -147,7 +152,17 @@ export function selectBalanceDisplay(
     // A lone fiat holding that merely isn't `currency` (a GBP-only account
     // viewed in EUR) is a multi-currency balance, not a commodity: it falls
     // through to the fiat classification below instead of reading in "units".
-    !operatingCurrencies.includes(held[0].currency)
+    !operatingCurrencies.includes(held[0].currency) &&
+    // A lone holding in a currency the ledger never declared operating (an
+    // JPY travel account in a EUR/GBP ledger) reads in "units" too, ONLY
+    // while there is nothing better to show: this branch cannot use
+    // `convertedTotal` (a currency figure, not a unit count) at all, so once
+    // the caller HAS converted this balance into the display currency, that
+    // reads better than a raw "150,000 JPY" with no equivalent beside it —
+    // see the `fiat.length === 0` case below, which then takes over. Without
+    // a converted read yet (or for a real non-currency commodity, which never
+    // gets one), this still shows the ledger's own units, unchanged.
+    convertedTotal === undefined
   ) {
     return {
       kind: "units",
@@ -168,7 +183,16 @@ export function selectBalanceDisplay(
   );
 
   if (fiat.length === 0) {
-    return { kind: "money", value: 0, notInTotal };
+    // A balance holding only non-operating currencies (a USD or JPY account
+    // in a EUR/GBP ledger) is not empty and must not read as a bogus €0.00 —
+    // once the caller has a converted total to offer (the same second,
+    // `displayCurrency`-scoped read a "multi" balance uses), show only that,
+    // the way a "multi" balance's "≈" line discloses one. Without a converted
+    // total — a genuinely empty balance, or an old caller that never reads
+    // one — this stays the plain zero it always was.
+    return holdings.length > 0 && convertedTotal !== undefined
+      ? { kind: "multi", holdings: [], converted: convertedTotal, notInTotal }
+      : { kind: "money", value: 0, notInTotal };
   }
   if (fiat.length === 1 && fiat[0].currency === currency) {
     return { kind: "money", value: fiat[0].number, notInTotal };

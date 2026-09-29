@@ -238,6 +238,64 @@ describe("selectBalanceDisplay with multiple operating currencies", () => {
     });
   });
 
+  it("shows only the converted total for a balance held entirely in non-operating currencies", () => {
+    // A USD or JPY-only account in a EUR/GBP ledger: not empty, but nothing
+    // in it is an operating currency, so there is no native line to draw —
+    // it must read as "≈ total", never a bogus €0.00.
+    const display = selectBalanceDisplay(
+      { JPY: "150000.00" },
+      undefined,
+      "EUR",
+      undefined,
+      ["EUR", "GBP"],
+      142.5,
+    );
+    expect(display).toEqual({
+      kind: "multi",
+      holdings: [],
+      converted: 142.5,
+      notInTotal: [{ currency: "JPY", number: 150000, scale: 2 }],
+    });
+  });
+
+  it("without a converted total yet, a lone non-operating holding still reads in its own units", () => {
+    // Before the second, currency-scoped read lands, there is nothing better
+    // than the ledger's own units to show — same as any other lone commodity.
+    const display = selectBalanceDisplay(
+      { JPY: "150000.00" },
+      undefined,
+      "EUR",
+      undefined,
+      ["EUR", "GBP"],
+    );
+    expect(display).toEqual({
+      kind: "units",
+      units: { currency: "JPY", number: 150000, scale: 2 },
+      value: null,
+    });
+  });
+
+  it("multiple non-operating holdings with no converted total yet stay a plain zero", () => {
+    // Two-or-more holdings never qualify for "units" (that's reserved for a
+    // lone commodity), so this is the genuine "nothing better to show yet"
+    // fallback the money branch always was.
+    const display = selectBalanceDisplay(
+      { JPY: "150000.00", USD: "10.00" },
+      undefined,
+      "EUR",
+      undefined,
+      ["EUR", "GBP"],
+    );
+    expect(display).toEqual({
+      kind: "money",
+      value: 0,
+      notInTotal: [
+        { currency: "JPY", number: 150000, scale: 2 },
+        { currency: "USD", number: 10, scale: 2 },
+      ],
+    });
+  });
+
   it("without an explicit operatingCurrencies list, reads only the display currency, GBP left as notInTotal", () => {
     // Default is [currency] — an old caller that hasn't opted into multi-currency
     // display still reads exactly the EUR figure, with GBP merely disclosed —

@@ -1,45 +1,35 @@
-import { useCallback, useMemo } from "react";
+import { useCallback } from "react";
 import { useReactiveVar } from "@apollo/client";
 import { displayCurrencyVar } from "@/common/vars/display-currency";
 import { getPrimaryCurrency } from "@/common/currency-util";
-import { useLedgerPrices } from "@/common/hooks/use-ledger-prices";
 
 /**
  * The currency Reports and Accounts' "≈ total" convert into, plus the set of
- * currencies worth offering: the ledger's own `operating_currency` list, in
- * ledger order, plus any commodity that pairs with one of them in a `price`
- * directive (`getLedgerCommodities`' `base`/`quote`) — a ledger with `price GBP
- * EUR` offers GBP even though only EUR is declared operating. Persisted per
- * ledger (`displayCurrencyVar`), so switching ledgers doesn't fight over one
- * saved choice.
+ * currencies worth offering: exactly the ledger's own `operating_currency`
+ * list, in ledger order. Persisted per ledger (`displayCurrencyVar`), so
+ * switching ledgers doesn't fight over one saved choice.
+ *
+ * `options` used to also offer any commodity that merely paired with an
+ * operating currency in a `price` directive (a stock's cost-basis pair, but
+ * also — since `price` records both fiat/fiat conversions and commodity
+ * cost bases alike — every other currency the ledger ever priced against
+ * one, e.g. a travel-cash JPY or a BTC holding). On a ledger with several
+ * such pairs that grew the picker past a handful of pills into an opaque
+ * "pick one" dropdown, and the very same list doubles as `operatingCurrencies`
+ * for `selectBalanceDisplay` (see account-table.tsx, select-trial-balance.ts,
+ * select-account-balance-series.ts) — the set of currencies a multi-currency
+ * balance shows a native line for. Padding it with priced-but-not-operating
+ * commodities made those get a line of their own too, instead of folding into
+ * the converted "≈ total" the way a currency the ledger never declared
+ * operating should. Both are fixed by the same change: `options` is exactly
+ * `currencies`, nothing added.
  */
 export const useDisplayCurrency = (ledgerId: string, currencies: string[]) => {
   const saved = useReactiveVar(displayCurrencyVar);
-  const { prices } = useLedgerPrices(ledgerId);
-
-  const options = useMemo(() => {
-    const ordered = [...currencies];
-    const seen = new Set(ordered);
-    for (const pair of prices ?? []) {
-      for (const candidate of [pair.base, pair.quote]) {
-        // Only offer a commodity that actually forms a pair with a declared
-        // operating currency — a ledger's price directives can also record a
-        // stock's cost basis (RGAGX in USD), which isn't a currency to switch
-        // display into.
-        const pairsWithOperating =
-          currencies.includes(pair.base) || currencies.includes(pair.quote);
-        if (pairsWithOperating && !seen.has(candidate)) {
-          seen.add(candidate);
-          ordered.push(candidate);
-        }
-      }
-    }
-    return ordered;
-  }, [currencies, prices]);
 
   const savedCurrency = ledgerId ? saved[ledgerId] : undefined;
   const currency =
-    savedCurrency && options.includes(savedCurrency)
+    savedCurrency && currencies.includes(savedCurrency)
       ? savedCurrency
       : getPrimaryCurrency(currencies);
 
@@ -53,5 +43,5 @@ export const useDisplayCurrency = (ledgerId: string, currencies: string[]) => {
     [ledgerId],
   );
 
-  return { currency, options, setCurrency };
+  return { currency, options: currencies, setCurrency };
 };
