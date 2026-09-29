@@ -45,6 +45,11 @@ export async function incrementInWindow(
       return { count, resetInMs: windowMs };
     }
     const ttl = await client.pTTL(key);
+    if (ttl === -1) {
+      // INCR and PEXPIRE are separate round trips, so a restart between them
+      // leaves a counter that never expires — a permanent ban, not a budget.
+      await client.pExpire(key, windowMs);
+    }
     return { count, resetInMs: ttl > 0 ? ttl : windowMs };
   } catch (err) {
     counterLogger.error("Redis counter unavailable", {
