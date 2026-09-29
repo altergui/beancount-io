@@ -218,6 +218,56 @@ describe("accountBalanceSeries (cumulative stock)", () => {
   });
 });
 
+describe("a time window that opens before the first transaction", () => {
+  // The mobile app asks for "0001-01-01 - <today>" to mean "all history, no
+  // future-dated entries". Spanning that window literally emitted ~24k empty
+  // monthly points per series (MBs per report); the series must instead start
+  // at the interval holding the first transaction.
+  const window = { begin: "0001-01-01", end: "2024-03-01" };
+
+  it("starts accountBalanceSeries at the first transaction's interval", () => {
+    const rows = accountBalanceSeries(
+      LEDGER,
+      "month",
+      ["Assets"],
+      "USD",
+      usdMap,
+      window,
+    );
+    expect(rows).toEqual([
+      { date: "2024-01-31", balance: { USD: "1000" } },
+      { date: "2024-02-29", balance: { USD: "3000" } },
+    ]);
+  });
+
+  it("starts intervalTotals at the first transaction's interval", () => {
+    const rows = intervalTotals(
+      LEDGER,
+      "month",
+      ["Income"],
+      "USD",
+      usdMap,
+      window,
+    );
+    expect(rows.map((r) => [r.date, r.balance])).toEqual([
+      ["2024-01-31", { USD: "-1000" }],
+      ["2024-02-29", { USD: "-2000" }],
+    ]);
+  });
+
+  it("keeps a window that opens after the first transaction exact", () => {
+    const rows = accountBalanceSeries(
+      LEDGER,
+      "month",
+      ["Assets"],
+      "USD",
+      usdMap,
+      { begin: "2024-02-10", end: "2024-03-01" },
+    );
+    expect(rows).toEqual([{ date: "2024-02-29", balance: { USD: "3000" } }]);
+  });
+});
+
 describe("cost-lot valuation flows through the series (issue #5)", () => {
   // Buy 10 HOOL {10 USD}; no HOOL market price exists.
   const heldAtCost: DirectiveJson[] = [

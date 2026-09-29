@@ -241,6 +241,12 @@ function matchesAccountOrChild(account: string, prefixes: string[]): boolean {
  * `FilteredLedger.interval_ranges`: with an explicit `window` (a `time` filter's
  * `date_range`) span exactly `[begin, end)` with `complete=false` intervals;
  * without one, span the directive dates with `complete=true` intervals.
+ *
+ * One deliberate departure from Fava: a window opening before the first
+ * transaction starts at that transaction's interval instead. The points it
+ * drops are all empty, but a `0001-01-01 - <today>` window (the mobile app's
+ * "exclude future-dated entries") would otherwise emit ~24k monthly points per
+ * series.
  */
 function seriesRanges(
   directives: DirectiveJson[],
@@ -248,7 +254,13 @@ function seriesRanges(
   window?: IntervalWindow,
 ): DateRange[] {
   if (window) {
-    return intervalRanges(window.begin, window.end, key, false);
+    const span = firstAndLastDate(directives);
+    const firstBoundary = span ? resolveInterval(key).getPrev(span[0]) : null;
+    const begin =
+      firstBoundary && firstBoundary > window.begin
+        ? firstBoundary
+        : window.begin;
+    return intervalRanges(begin, window.end, key, false);
   }
   const span = firstAndLastDate(directives);
   if (!span) return [];
