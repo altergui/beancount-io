@@ -102,6 +102,12 @@ interface StripeConfig {
     publicKey: string;
     privateKey: string;
   };
+  /**
+   * Self-hosted escape hatch: force everyone to a fixed SubscriptionTier
+   * (e.g. "ENTERPRISE") instead of resolving via Stripe. Unset in the SaaS
+   * deployment. See DEFAULT_SUBSCRIPTION_TIER in .env.
+   */
+  defaultTier: string;
 }
 
 interface RedisConfig {
@@ -424,6 +430,7 @@ export const config: AppConfig = {
       publicKey: process.env.STRIPE_DEV_PUBLIC_KEY || "",
       privateKey: process.env.STRIPE_DEV_PRIVATE_KEY || "",
     },
+    defaultTier: process.env.DEFAULT_SUBSCRIPTION_TIER || "",
   },
   tempAssetS3: {
     endpoint: process.env.TEMP_ASSETS_AWS_S3_ENDPOINT || "",

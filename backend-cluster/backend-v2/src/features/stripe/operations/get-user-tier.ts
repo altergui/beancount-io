@@ -1,6 +1,7 @@
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { IModels } from "@/foundation/models";
 import { logger } from "@/shared/logger";
+import { config } from "@/config/config";
 import {
   SubscriptionTier,
   TierLimits,
@@ -35,6 +36,13 @@ export async function getUserTier({
   postgresDb,
   userId,
 }: GetUserTierParams): Promise<SubscriptionTier> {
+  // Self-hosted escape hatch: DEFAULT_SUBSCRIPTION_TIER pins every user to a
+  // fixed tier instead of resolving via Stripe. Unset in the SaaS deployment.
+  const forcedTier = config.stripe.defaultTier as SubscriptionTier;
+  if (forcedTier && Object.values(SubscriptionTier).includes(forcedTier)) {
+    return forcedTier;
+  }
+
   const stripeService = stripe;
   try {
     // Check if user has an active subscription using the existing isPaid infrastructure
