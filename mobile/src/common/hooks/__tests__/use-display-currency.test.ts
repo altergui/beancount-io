@@ -14,15 +14,17 @@ import {
   interceptModules,
 } from "../../__tests__/fixtures/intercept-modules";
 
-type VarsMock = typeof import("../../__tests__/fixtures/mock-display-currency-var");
+type VarsMock =
+  typeof import("../../__tests__/fixtures/mock-display-currency-var");
 type Subject = typeof import("../use-display-currency");
 
-const REACT_HOOKS = require.resolve("../../__tests__/fixtures/mock-react-hooks");
+const REACT_HOOKS =
+  require.resolve("../../__tests__/fixtures/mock-react-hooks");
 const APOLLO = require.resolve("../../__tests__/fixtures/mock-apollo-client");
-const VARS = require.resolve("../../__tests__/fixtures/mock-display-currency-var");
-const CURRENCY_UTIL = require.resolve(
-  "../../__tests__/fixtures/mock-currency-util",
-);
+const VARS =
+  require.resolve("../../__tests__/fixtures/mock-display-currency-var");
+const CURRENCY_UTIL =
+  require.resolve("../../__tests__/fixtures/mock-currency-util");
 const SUBJECT = require.resolve("../use-display-currency");
 
 let restore: () => void;

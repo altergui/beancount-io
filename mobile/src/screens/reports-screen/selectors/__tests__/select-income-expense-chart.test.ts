@@ -142,8 +142,7 @@ describe("selectIncomeExpenseChartSeries with a future-dated tail (m?/note incom
   const netProfitData = incomeData.map((point, index) => ({
     date: point.date,
     balance: {
-      GBP:
-        (point.balance.GBP ?? 0) + (expensesData[index].balance.GBP ?? 0),
+      GBP: (point.balance.GBP ?? 0) + (expensesData[index].balance.GBP ?? 0),
     },
   }));
 
