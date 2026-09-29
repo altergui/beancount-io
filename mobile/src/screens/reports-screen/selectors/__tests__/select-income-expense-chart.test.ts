@@ -99,11 +99,12 @@ describe("selectIncomeExpenseChartSeries with a future-dated tail (m?/note incom
   // shows its history) — which is now one of those empty future months, so the
   // window it draws is almost entirely future and income reads as ~0 even
   // though the ledger has real income every month up to today.
-  const monthlyIncome = (amount: number, month: string) => ({
+  type MonthlyPoint = { date: string; balance: Record<string, number> };
+  const monthlyIncome = (amount: number, month: string): MonthlyPoint => ({
     date: `${month}-28`,
     balance: { GBP: -amount },
   });
-  const monthlyExpense = (amount: number, month: string) => ({
+  const monthlyExpense = (amount: number, month: string): MonthlyPoint => ({
     date: `${month}-28`,
     balance: { GBP: amount },
   });
@@ -111,7 +112,7 @@ describe("selectIncomeExpenseChartSeries with a future-dated tail (m?/note incom
   // Six months of monthly salary income up to "today" (2026-09), then
   // six income-free months the ledger's global span still produces because a
   // Liabilities-only installment plan runs through 2027-03.
-  const incomeData = [
+  const incomeData: MonthlyPoint[] = [
     monthlyIncome(3000, "2026-04"),
     monthlyIncome(3000, "2026-05"),
     monthlyIncome(3000, "2026-06"),
@@ -125,7 +126,7 @@ describe("selectIncomeExpenseChartSeries with a future-dated tail (m?/note incom
     { date: "2027-02-28", balance: {} },
     { date: "2027-03-31", balance: {} },
   ];
-  const expensesData = [
+  const expensesData: MonthlyPoint[] = [
     monthlyExpense(2000, "2026-04"),
     monthlyExpense(2000, "2026-05"),
     monthlyExpense(2000, "2026-06"),
