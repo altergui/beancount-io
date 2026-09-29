@@ -4,6 +4,7 @@ import type { IPullRequestWorkflow } from "@/features/gitea/pull-request/workflo
 import { type DbExecutor } from "@/drizzle/drizzle";
 import { type IModels } from "@/foundation/models";
 import { type ISendGrid } from "@/foundation/sendgrid";
+import { type IResend } from "@/foundation/resend";
 import { type CacheHelper } from "@/shared/cache";
 import { type IFavaClientFactory } from "@/foundation/clients/fava-client-factory";
 import { type IGiteaClientFactory } from "@/foundation/clients/gitea-client-factory";
@@ -67,6 +68,7 @@ export interface ClientFactoryLayer {
   giteaClientFactory: IGiteaClientFactory;
   plaidClient: IPlaidClient;
   sendgrid: ISendGrid;
+  resend: IResend;
   cacheHelper: CacheHelper;
 }
 

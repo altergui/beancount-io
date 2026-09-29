@@ -205,7 +205,7 @@ export function buildServiceLayer(input: {
     auth: new AuthService(
       input.database.models,
       input.database.db,
-      input.clients.sendgrid,
+      input.clients.resend,
       stripe,
       input.clients.favaClientFactory,
       input.config,

@@ -21,6 +21,10 @@ interface SendGridConfig {
   apiKey: string;
 }
 
+interface ResendConfig {
+  apiKey: string;
+}
+
 interface AnalyticsConfig {
   gaMeasurementId: string;
 }
@@ -190,6 +194,7 @@ export interface AppConfig {
   analytics: AnalyticsConfig;
   logger: LoggerConfig;
   sendGrid: SendGridConfig;
+  resend: ResendConfig;
   postgres: PostgresConfig;
   redis: RedisConfig;
   jwt: JwtConfig;
@@ -403,6 +408,9 @@ export const config: AppConfig = {
   },
   sendGrid: {
     apiKey: process.env.SEND_GRID_API_KEY || "",
+  },
+  resend: {
+    apiKey: process.env.RESEND_API_KEY || "",
   },
   analytics: {
     gaMeasurementId: "G-94TFG6X2Q5",

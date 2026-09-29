@@ -1,6 +1,6 @@
 import type { IModels } from "@/foundation/models";
 import type { DbExecutor } from "@/drizzle/drizzle";
-import type { ISendGrid } from "@/foundation/sendgrid";
+import type { IResend } from "@/foundation/resend";
 import type { IStripeService } from "@/features/stripe/service/stripe-service";
 import type { IFavaClientFactory } from "@/foundation/clients/fava-client-factory";
 import { type AppConfig } from "@/config/config";
@@ -148,7 +148,7 @@ export class AuthService implements IAuthService {
       | "paidCustomer"
     >,
     private readonly db: DbExecutor,
-    private readonly sendgrid: ISendGrid,
+    private readonly mailer: IResend,
     private readonly stripe: IStripeService,
     private readonly favaClientFactory: IFavaClientFactory,
     private readonly config: Pick<AppConfig, "favaApi" | "dashboard" | "gitea">,
@@ -214,7 +214,7 @@ export class AuthService implements IAuthService {
             mobileAppUrl: "http://onelink.to/v3rz2v",
             helpCenterUrl: "https://beancount.io/docs/help-center",
           };
-          await this.sendgrid.sendMail({
+          await this.mailer.sendMail({
             to: email,
             subject: "Welcome to Beancount.io!",
             html: renderWelcomeHtml(welcomeParams),
@@ -347,7 +347,7 @@ export class AuthService implements IAuthService {
     logger.debug(`sending out password reset email ${link}`);
 
     const resetParams = { resetLink: link };
-    await this.sendgrid.sendMail({
+    await this.mailer.sendMail({
       to: email,
       subject: "Reset your Password",
       html: renderPasswordResetHtml(resetParams),
@@ -521,7 +521,7 @@ export class AuthService implements IAuthService {
     );
 
     const preSignupParams = { otp: session.otp };
-    await this.sendgrid.sendMail({
+    await this.mailer.sendMail({
       to: normalizedEmail,
       subject: "Verify Your Email - Beancount.io",
       html: renderSignupOtpHtml(preSignupParams),

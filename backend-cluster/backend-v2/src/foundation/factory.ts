@@ -1,4 +1,5 @@
 import { SendGrid, ConsoleSendGrid } from "@/foundation/sendgrid";
+import { Resend, ConsoleResend } from "@/foundation/resend";
 import { type AppConfig } from "@/config/config";
 import { createDatabaseConnection } from "@/drizzle/drizzle";
 import { createRedisCache } from "@/foundation/redis/redis-utils";
@@ -28,6 +29,11 @@ export async function buildAppLayers(config: AppConfig): Promise<AppLayers> {
     retryLimit: 2,
     defaultFrom: "Beancount.io <noreply@mail.beancount.io>",
   };
+  const resendOpts = {
+    apiKey: config.resend.apiKey,
+    retryLimit: 2,
+    defaultFrom: "Beancount.io <noreply@mail.beancount.io>",
+  };
   const clients: ClientFactoryLayer = {
     favaClientFactory: new FavaClientFactory(models, postgresDb, config),
     giteaClientFactory: new GiteaClientFactory(models, postgresDb, config),
@@ -36,6 +42,12 @@ export async function buildAppLayers(config: AppConfig): Promise<AppLayers> {
       config.env === "production"
         ? new SendGrid(sendGridOpts)
         : new ConsoleSendGrid(sendGridOpts),
+    // Unlike sendgrid, gated on the API key rather than config.env: this stack
+    // runs NODE_ENV=development in every local/dev deployment (docker-mac
+    // included), and a real key configured there means real send is wanted.
+    resend: config.resend.apiKey
+      ? new Resend(resendOpts)
+      : new ConsoleResend(resendOpts),
     cacheHelper: createCacheHelper(redisCache),
   };
 
