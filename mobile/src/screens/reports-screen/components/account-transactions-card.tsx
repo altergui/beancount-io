@@ -9,6 +9,7 @@ import { LoadingTile } from "@/components/loading-tile";
 import { FadeInView } from "@/components/crossfade";
 import { DashboardCard } from "@/components";
 import { useGetLedgerJournalQuery } from "@/generated-graphql/graphql";
+import { excludeFutureTimeRange } from "@/common/exclude-future-time";
 import { EntryRow } from "@/screens/transactions-screen/entry-row";
 import {
   DirectiveType,
@@ -83,6 +84,7 @@ export function AccountTransactionsCard({
         offset: 0,
         limit: FETCH_WINDOW,
         directiveTypes: [DirectiveType.TRANSACTION],
+        time: excludeFutureTimeRange(),
       },
     },
     fetchPolicy: "cache-and-network",

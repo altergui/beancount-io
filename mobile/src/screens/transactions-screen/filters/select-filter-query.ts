@@ -1,4 +1,5 @@
 import { getFormatDate } from "../../../common/format-util";
+import { excludeFutureTimeRange } from "../../../common/exclude-future-time";
 import {
   NO_FILTERS,
   ScopedTransactionFilters,
@@ -108,7 +109,15 @@ export const formatTimeFilter = (range: DateRange): string =>
 
 /**
  * Translates filter state into query fields, omitting whatever is inactive so
- * the variables stay identical to an unfiltered query when nothing is set.
+ * the variables stay identical to an unfiltered query when nothing is set —
+ * except `time`, which always excludes future-dated entries. `filters.range
+ * === "all"` has no window of its own (`resolveDateRange` returns `null`, and
+ * stays that way so the filter-count dot doesn't light up for the default
+ * state); this still needs *a* `time` value to keep tomorrow's postings out,
+ * so it falls back to {@link excludeFutureTimeRange}. A "custom" range whose
+ * chosen end is itself in the future is clamped the same way: the filter
+ * picker lets someone pick an end date beyond today, but nothing downstream
+ * should read that as "show me the future."
  */
 export const toFilterQuery = (
   filters: TransactionFilters,
@@ -120,10 +129,14 @@ export const toFilterQuery = (
     query.transactionSubtypes = [...filters.statuses];
   }
 
+  const todayStr = getFormatDate(today);
   const range = resolveDateRange(filters, today);
-  if (range) {
-    query.time = formatTimeFilter(range);
-  }
+  query.time =
+    range && range.end <= todayStr
+      ? formatTimeFilter(range)
+      : range
+        ? formatTimeFilter({ start: range.start, end: todayStr })
+        : excludeFutureTimeRange(todayStr);
 
   if (filters.account) {
     query.account = filters.account;

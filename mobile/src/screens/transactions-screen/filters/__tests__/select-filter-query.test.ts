@@ -103,13 +103,16 @@ describe("resolveDateRange", () => {
     expect(resolveDateRange(reversed, TODAY)).toBe(null);
   });
 
-  it("does not swap the ends of a reversed range", () => {
+  it("does not swap the ends of a reversed range, falling back to excluding the future", () => {
     const reversed = filters({
       range: "custom",
       startDate: "2026-10-10",
       endDate: "2026-09-10",
     });
-    expect(toFilterQuery(reversed, TODAY).time).toBe(undefined);
+    // The filter sheet blocks Apply on a reversed range, so reaching here is
+    // defensive; it must never forward the invalid pair, but it still owes the
+    // future-exclusion guarantee every other unfiltered read gets.
+    expect(toFilterQuery(reversed, TODAY).time).toBe("0001-01-01 - 2026-07-22");
   });
 });
 
@@ -200,23 +203,36 @@ describe("formatTimeFilter", () => {
 });
 
 describe("toFilterQuery", () => {
-  it("omits every field when nothing is filtered", () => {
-    expect(toFilterQuery(NO_FILTERS, TODAY)).toEqual({});
+  it("omits every non-time field when nothing is filtered, but still excludes the future", () => {
+    // "all" has no window of its own, so this is the fallback every caller of
+    // an otherwise-unfiltered journal relies on to keep tomorrow's postings out.
+    expect(toFilterQuery(NO_FILTERS, TODAY)).toEqual({
+      time: "0001-01-01 - 2026-07-22",
+    });
   });
 
-  it("passes selected statuses as transaction subtypes", () => {
+  it("passes selected statuses as transaction subtypes, alongside the future-exclusion default", () => {
     const query = toFilterQuery(
       filters({ statuses: ["pending", "other"] }),
       TODAY,
     );
     expect(query.transactionSubtypes).toEqual(["pending", "other"]);
-    expect(query.time).toBe(undefined);
+    expect(query.time).toBe("0001-01-01 - 2026-07-22");
   });
 
   it("passes a resolved range as the time expression", () => {
     expect(toFilterQuery(filters({ range: "YTD" }), TODAY).time).toBe(
       "2026-01-01 - 2026-07-22",
     );
+  });
+
+  it("clamps a custom range whose end is in the future to today", () => {
+    const future = filters({
+      range: "custom",
+      startDate: "2026-01-01",
+      endDate: "2026-12-31",
+    });
+    expect(toFilterQuery(future, TODAY).time).toBe("2026-01-01 - 2026-07-22");
   });
 
   it("passes the picked account through", () => {
@@ -314,7 +330,9 @@ describe("selectFiltersForLedger (w?/note-115 cross-ledger filter leak)", () => 
 
   it("never yields an account for a mismatched ledger's query", () => {
     const resolved = selectFiltersForLedger(applied("alice/a"), "alice/b");
-    expect(toFilterQuery(resolved, TODAY)).toEqual({});
+    expect(toFilterQuery(resolved, TODAY)).toEqual({
+      time: "0001-01-01 - 2026-07-22",
+    });
   });
 });
 

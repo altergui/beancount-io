@@ -10,6 +10,7 @@ import { DashboardCard } from "@/components";
 import { FadeInView } from "@/components/crossfade";
 import { BAR_CHART_HEIGHT, BarChartD3 } from "@/common/d3/bar-chart-d3";
 import { useGetLedgerJournalQuery } from "@/generated-graphql/graphql";
+import { excludeFutureTimeRange } from "@/common/exclude-future-time";
 import {
   DirectiveType,
   JournalDirectiveType,
@@ -69,6 +70,7 @@ export function SpendingCard({
         offset: 0,
         limit: SPENDING_WINDOW,
         directiveTypes: [DirectiveType.TRANSACTION],
+        time: excludeFutureTimeRange(),
       },
     },
     skip: !ledgerId,

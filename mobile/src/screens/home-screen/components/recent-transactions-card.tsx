@@ -9,6 +9,7 @@ import { LoadingTile } from "@/components/loading-tile";
 import { FadeInView } from "@/components/crossfade";
 import { DashboardCard } from "@/components";
 import { useGetLedgerJournalQuery } from "@/generated-graphql/graphql";
+import { excludeFutureTimeRange } from "@/common/exclude-future-time";
 import { EntryRow } from "@/screens/transactions-screen/entry-row";
 import {
   DirectiveType,
@@ -50,6 +51,7 @@ export function RecentTransactionsCard({
         offset: 0,
         limit: RECENT_LIMIT,
         directiveTypes: [DirectiveType.TRANSACTION],
+        time: excludeFutureTimeRange(),
       },
     },
     skip: !ledgerId,

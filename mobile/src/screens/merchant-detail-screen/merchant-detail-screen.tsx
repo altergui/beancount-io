@@ -22,6 +22,7 @@ import { useTranslations } from "@/common/hooks/use-translations";
 import { formatLedgerDateShort } from "@/common/date-format";
 import { formatMoneyWithCurrency } from "@/common/number-utils";
 import { LEADING_TEXT_ALIGN } from "@/common/rtl";
+import { excludeFutureTimeRange } from "@/common/exclude-future-time";
 import { ColorTheme } from "@/types/theme-props";
 import {
   useGetLedgerJournalQuery,
@@ -289,6 +290,7 @@ function MerchantDetailBody({ payee }: { payee: string }) {
         limit: PAGE_SIZE,
         directiveTypes: DIRECTIVE_TYPES,
         filter: journalFilter || undefined,
+        time: excludeFutureTimeRange(),
       },
     },
     skip: !ledgerId,
@@ -350,6 +352,7 @@ function MerchantDetailBody({ payee }: { payee: string }) {
             limit: PAGE_SIZE,
             directiveTypes: DIRECTIVE_TYPES,
             filter: journalFilter || undefined,
+            time: excludeFutureTimeRange(),
           },
         },
         updateQuery: (prev, { fetchMoreResult }) => {

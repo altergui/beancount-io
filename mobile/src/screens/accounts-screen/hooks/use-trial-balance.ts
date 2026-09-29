@@ -1,5 +1,6 @@
 import { useTrialBalanceQuery } from "@/generated-graphql/graphql";
 import { VALUATION_CONVERSION } from "@/common/balance-util";
+import { excludeFutureTimeRange } from "@/common/exclude-future-time";
 
 /** Pinned for offline cold start — see m34 fetch-policy audit. */
 const TRIAL_BALANCE_FETCH_POLICY = "cache-and-network" as const;
@@ -15,7 +16,7 @@ const TRIAL_BALANCE_FETCH_POLICY = "cache-and-network" as const;
  */
 export const useTrialBalance = (
   ledgerId: string,
-  time?: string,
+  time: string = excludeFutureTimeRange(),
   conversion: string = VALUATION_CONVERSION,
 ) => {
   const { loading, data, error, refetch } = useTrialBalanceQuery({

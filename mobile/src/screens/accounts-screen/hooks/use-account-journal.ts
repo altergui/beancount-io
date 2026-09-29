@@ -2,6 +2,7 @@ import {
   AccountJournalQueryInput,
   useAccountJournalQuery,
 } from "@/generated-graphql/graphql";
+import { excludeFutureTimeRange } from "@/common/exclude-future-time";
 
 /** Default page size for account-journal pagination. */
 export const ACCOUNT_JOURNAL_PAGE_SIZE = 20;
@@ -24,6 +25,7 @@ export const useAccountJournal = (
     limit: ACCOUNT_JOURNAL_PAGE_SIZE,
     offset: 0,
     with_children: true,
+    time: excludeFutureTimeRange(),
     ...options,
   };
   const { loading, data, error, refetch, fetchMore, networkStatus } =

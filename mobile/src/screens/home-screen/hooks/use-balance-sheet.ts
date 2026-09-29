@@ -1,5 +1,6 @@
 import { useBalanceSheetQuery } from "@/generated-graphql/graphql";
 import { VALUATION_CONVERSION } from "@/common/balance-util";
+import { excludeFutureTimeRange } from "@/common/exclude-future-time";
 
 /** Pinned for offline cold start — see m34 fetch-policy audit. */
 const BALANCE_SHEET_FETCH_POLICY = "cache-and-network" as const;
@@ -16,7 +17,7 @@ const BALANCE_SHEET_FETCH_POLICY = "cache-and-network" as const;
  */
 export const useBalanceSheet = (
   ledgerId: string,
-  time?: string,
+  time: string = excludeFutureTimeRange(),
   conversion: string = VALUATION_CONVERSION,
 ) => {
   const { loading, data, error, refetch } = useBalanceSheetQuery({
