@@ -22,6 +22,18 @@ describe("getJwks", () => {
     expect(jwks.keys[0].d).toBeTruthy();
   });
 
+  it("uses a supplied JWKS outside production so tokens survive restarts", () => {
+    expect(getJwks("development", privateEcJwks)).toEqual(
+      JSON.parse(privateEcJwks),
+    );
+  });
+
+  it("still validates a JWKS supplied outside production", () => {
+    expect(() => getJwks("development", "{nope")).toThrow(
+      "OAUTH_JWKS must be valid JSON",
+    );
+  });
+
   it("loads a production private JWKS from the deployment secret", () => {
     expect(getJwks("production", privateEcJwks)).toEqual(
       JSON.parse(privateEcJwks),

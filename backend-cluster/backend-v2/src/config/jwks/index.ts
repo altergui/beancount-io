@@ -74,12 +74,17 @@ const developmentJwks = generateDevelopmentJwks();
  * tracked at all. Production must receive a complete private JWKS through the
  * deployment secret boundary. Falling back to a source-controlled key would
  * make every public clone an access-token issuer.
+ *
+ * A non-production deployment may also supply OAUTH_JWKS (validated the same
+ * way): self-hosted stacks run NODE_ENV=development, and an ephemeral key there
+ * invalidates every issued token -- logging the mobile app out -- on each
+ * backend restart.
  */
 export function getJwks(
   env: Environment,
   serializedProductionJwks: string | undefined = process.env.OAUTH_JWKS,
 ): SigningJwks {
-  if (env !== "production") {
+  if (env !== "production" && !serializedProductionJwks?.trim()) {
     return developmentJwks;
   }
 
